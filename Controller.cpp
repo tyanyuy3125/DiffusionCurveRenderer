@@ -1,566 +1,513 @@
 #include "Controller.h"
-#include "Util.h"
+#include "Helper.h"
+#include "Window.h"
+
+#include <QApplication>
+#include <QDebug>
+#include <QOpenGLPaintDevice>
+#include <QPaintDevice>
+#include <QPainter>
 
 Controller::Controller(QObject *parent)
     : QObject(parent)
+    , mIfps(0.0f)
     , mMode(Mode::Select)
-    , mMouseLeftButtonPressed(false)
-    , mMouseMiddleButtonPressed(false)
-    , mMouseRightButtonPressed(false)
-    , mMousePressedOnCurve(false)
-    , mZoomStep(1.1f)
+    , mRenderMode(RenderMode::Contour)
+    , mGlobalContourThickness(DEFAULT_CONTOUR_THICKNESS)
+    , mGlobalDiffusionWidth(DEFAULT_DIFFUSION_WIDTH)
+    , mGlobalContourColor(DEFAULT_CONTOUR_COLOR)
+    , mSelectedCurve(nullptr)
+    , mSelectedControlPoint(nullptr)
+    , mSelectedColorPoint(nullptr)
+
 {
-    mWindow = new Window;
-    mCurveContainer = new CurveContainer;
-    mRendererManager = new RendererManager;
-    mProjectionParameters = new ProjectionParameters;
-    mTransformer = new Transformer;
+    mDashedPen.setDashPattern({8, 8});
+    mDashedPen.setWidthF(1.0f);
+    mDashedPen.setJoinStyle(Qt::MiterJoin);
+
+    mSolidPen.setWidthF(1.0f);
+    mSolidPen.setJoinStyle(Qt::MiterJoin);
+}
+
+Controller::~Controller() {}
+
+void Controller::init()
+{
+    initializeOpenGLFunctions();
+    //    glEnable(GL_BLEND);
+    //    glBlendFunc(GL_ONE, GL_ZERO);
+
+    mRendererManager = RendererManager::instance();
+    mCurveManager = CurveManager::instance();
+    mShaderManager = ShaderManager::instance();
+
+    mCamera = Camera::instance();
+    mCamera->setPixelRatio(mWindow->devicePixelRatio());
+
+    mManagers << mRendererManager //
+              << mCurveManager    //
+              << mShaderManager;
+
+    for (auto manager : mManagers)
+        manager->init();
+
     mFileDialog = new QFileDialog;
-
-    mProjectionParameters->left = 0;
-    mProjectionParameters->top = 0;
-    mProjectionParameters->zoomRatio = 0;
-    mProjectionParameters->pixelRatio = 0;
-    mProjectionParameters->right = 0;
-    mProjectionParameters->bottom = 0;
-    mProjectionParameters->width = 0;
-    mProjectionParameters->height = 0;
-
-    mTransformer->setProjectionParameters(mProjectionParameters);
-
-    mWindow->setTransformer(mTransformer);
-    mWindow->setProjectionParameters(mProjectionParameters);
-    mWindow->setRendererManager(mRendererManager);
-
-    mRendererManager->setCurveContainer(mCurveContainer);
-    mRendererManager->setProjectionParameters(mProjectionParameters);
-
-    connect(mCurveContainer, &CurveContainer::selectedCurveChanged, mWindow, &Window::onSelectedCurveChanged);
-    connect(mCurveContainer, &CurveContainer::selectedControlPointChanged, mWindow, &Window::onSelectedControlPointChanged);
-    connect(mCurveContainer, &CurveContainer::selectedColorPointChanged, mWindow, &Window::onSelectedColorPointChanged);
-
-    connect(mWindow, &Window::wheelMoved, this, &Controller::onWheelMoved);
-    connect(mWindow, &Window::mousePressed, this, &Controller::onMousePressed);
-    connect(mWindow, &Window::mouseReleased, this, &Controller::onMouseReleased);
-    connect(mWindow, &Window::mouseMoved, this, &Controller::onMouseMoved);
-    connect(mWindow, &Window::action, this, &Controller::onAction);
-
-    connect(mWindow, &Window::keyPressed, this, [=](Qt::Key key) {
-        switch (key) {
-        case Qt::Key_Control: {
-            mPressedKey = Qt::Key_Control;
-            mModeBeforeKeyPress = mMode;
-            onAction(Action::UpdateMode, (int) Mode::AppendControlPoint);
-            break;
-        }
-
-        case Qt::Key_Shift: {
-            mPressedKey = Qt::Key_Shift;
-            mModeBeforeKeyPress = mMode;
-            onAction(Action::UpdateMode, (int) Mode::InsertControlPoint);
-            break;
-        }
-
-        case Qt::Key_Alt: {
-            if (mCurveContainer->selectedCurve() != nullptr && mCurveContainer->selectedCurve()->getSize() >= 2) {
-                mPressedKey = Qt::Key_Alt;
-                mModeBeforeKeyPress = mMode;
-                onAction(Action::UpdateMode, (int) Mode::AddColorPoint);
-            }
-            break;
-        }
-
-        case Qt::Key_Delete: {
-            if (mCurveContainer->selectedColorPoint())
-                onAction(Action::RemoveColorPoint);
-            else if (mCurveContainer->selectedControlPoint())
-                onAction(Action::RemoveControlPoint);
-            else if (mCurveContainer->selectedCurve())
-                onAction(Action::RemoveCurve);
-
-            break;
-        }
-
-        default:
-            break;
-        }
-    });
-
-    connect(mWindow, &Window::keyReleased, this, [=](Qt::Key key) {
-        if (mPressedKey == key) {
-            mPressedKey = Qt::Key::Key_unknown;
-            onAction(Action::UpdateMode, (int) mModeBeforeKeyPress);
-        }
-    });
-
     connect(mFileDialog, &QFileDialog::fileSelected, this, [=](const QString &path) {
         if (!path.isEmpty())
-            switch (mLastFileAction) {
-            case Action::ShowLoadFromXmlDialog:
-                onAction(Action::LoadFromXml, path);
+            switch (mLastFileAction)
+            {
+            case Action::ShowLoadFromXMLDialog:
+                onAction(Action::LoadFromXML, path);
                 break;
-            case Action::ShowLoadFromJsonDialog:
-                onAction(Action::LoadFromJson, path);
+            case Action::ShowLoadFromJSONDialog:
+                onAction(Action::LoadFromJSON, path);
                 break;
-            case Action::ShowSaveAsJsonDialog:
-                onAction(Action::SaveAsJson, path);
+            case Action::ShowSaveAsJSONDialog:
+                onAction(Action::SaveAsJSON, path);
                 break;
-            case Action::ShowSaveAsPngDialog:
-                onAction(Action::SaveAsPng, path);
+            case Action::ShowSaveAsPNGDialog:
+                onAction(Action::SaveAsPNG, path);
                 break;
             default:
                 break;
             }
     });
-}
 
-void Controller::init()
-{
-    QVector<Curve *> curves = Util::loadCurveDataFromXml(":/Resources/CurveData/zephyr.xml");
-    mCurveContainer->addCurves(curves);
-    mWindow->showMaximized();
+    QVector<Bezier *> curves = Helper::loadCurveDataFromXML(":Resources/CurveData/zephyr.xml");
+    if (!curves.isEmpty())
+    {
+        mCurveManager->clear();
+        mCurveManager->addCurves(curves);
+    }
 }
 
 void Controller::onAction(Action action, CustomVariant value)
 {
-    switch (action) {
-    case Action::ShowLoadFromJsonDialog:
-        mLastFileAction = Action::ShowLoadFromJsonDialog;
+    switch (action)
+    {
+    case Action::Select: {
+        mCurveManager->select(value.toVector2D(), mCamera->zoom() * 10.0f);
+        break;
+    }
+    case Action::AddControlPoint: {
+        mCurveManager->addControlPoint(value.toVector2D());
+        break;
+    }
+    case Action::AddColorPoint: {
+        mCurveManager->addColorPoint(value.toVector2D());
+        break;
+    }
+    case Action::RemoveCurve:
+        mCurveManager->removeSelectedCurve();
+        break;
+    case Action::RemoveControlPoint:
+        mCurveManager->removeSelectedControlPoint();
+        break;
+    case Action::RemoveColorPoint:
+        mCurveManager->removeSelectedColorPoint();
+        break;
+    case Action::UpdateControlPointPosition:
+        if (mSelectedControlPoint)
+            mSelectedControlPoint->mPosition = value.toVector2D();
+        break;
+    case Action::UpdateColorPointPosition:
+        if (mSelectedColorPoint)
+            mSelectedColorPoint->mPosition = mSelectedCurve->parameterAt(value.toVector2D(), 10000);
+        break;
+    case Action::ClearCanvas:
+        mCurveManager->clear();
+        break;
+    case Action::LoadFromXML: {
+        QVector<Bezier *> curves = Helper::loadCurveDataFromXML(value.toString());
+        if (!curves.isEmpty())
+        {
+            mCurveManager->clear();
+            mCurveManager->addCurves(curves);
+        }
+        break;
+    }
+    case Action::SaveAsPNG: {
+        mRendererManager->save(value.toString());
+        break;
+    }
+    case Action::LoadFromJSON: {
+        QVector<Bezier *> curves = Helper::loadCurveDataFromJSON(value.toString());
+        if (!curves.isEmpty())
+        {
+            mCurveManager->clear();
+            mCurveManager->addCurves(curves);
+        }
+        break;
+    }
+    case Action::SaveAsJSON: {
+        Helper::saveCurveDataToJSON(mCurveManager->curves(), value.toString());
+        break;
+    }
+    case Action::ShowLoadFromJSONDialog:
+        mLastFileAction = Action::ShowLoadFromJSONDialog;
         mFileDialog->setFileMode(QFileDialog::ExistingFile);
         mFileDialog->setAcceptMode(QFileDialog::AcceptOpen);
         mFileDialog->setNameFilter("*.json");
         mFileDialog->show();
         break;
-    case Action::ShowSaveAsJsonDialog:
-        mLastFileAction = Action::ShowSaveAsJsonDialog;
+    case Action::ShowSaveAsJSONDialog:
+        mLastFileAction = Action::ShowSaveAsJSONDialog;
         mFileDialog->setFileMode(QFileDialog::AnyFile);
         mFileDialog->setAcceptMode(QFileDialog::AcceptSave);
         mFileDialog->setDefaultSuffix(".json");
         mFileDialog->setNameFilter("*.json");
         mFileDialog->show();
         break;
-    case Action::ShowLoadFromXmlDialog:
-        mLastFileAction = Action::ShowLoadFromXmlDialog;
+    case Action::ShowLoadFromXMLDialog:
+        mLastFileAction = Action::ShowLoadFromXMLDialog;
         mFileDialog->setFileMode(QFileDialog::ExistingFile);
         mFileDialog->setAcceptMode(QFileDialog::AcceptOpen);
         mFileDialog->setNameFilter("*.xml");
         mFileDialog->show();
         break;
-    case Action::ShowSaveAsPngDialog:
-        mLastFileAction = Action::ShowSaveAsPngDialog;
+    case Action::ShowSaveAsPNGDialog:
+        mLastFileAction = Action::ShowSaveAsPNGDialog;
         mFileDialog->setFileMode(QFileDialog::AnyFile);
         mFileDialog->setAcceptMode(QFileDialog::AcceptSave);
         mFileDialog->setDefaultSuffix(".png");
         mFileDialog->setNameFilter("*.png");
         mFileDialog->show();
         break;
-    case Action::UpdateColorRendererMode:
-        mWindow->setColorRendererMode((ColorRendererMode) value.toInt());
-        mRendererManager->onColorRendererModeChanged((ColorRendererMode) value.toInt());
-        break;
-    case Action::UpdateMode:
-        mMode = (Mode) value.toInt();
-        mWindow->setMode(mMode);
-        break;
-    case Action::UpdateRenderMode:
-        mWindow->setRenderMode((RenderMode) value.toInt());
-        mRendererManager->onRenderModeChanged((RenderMode) value.toInt());
-        break;
-    case Action::ClearCanvas:
-        mCurveContainer->setSelectedColorPoint(nullptr);
-        mCurveContainer->setSelectedControlPoint(nullptr);
-        mCurveContainer->setSelectedCurve(nullptr);
-        mCurveContainer->clear();
-        break;
-    case Action::LoadFromXml: {
-        QVector<Curve *> curves = Util::loadCurveDataFromXml(value.toString());
-        if (!curves.isEmpty()) {
-            mCurveContainer->setSelectedColorPoint(nullptr);
-            mCurveContainer->setSelectedControlPoint(nullptr);
-            mCurveContainer->setSelectedCurve(nullptr);
-            mCurveContainer->clear();
-            mCurveContainer->addCurves(curves);
+    }
+}
+
+void Controller::render(float ifps)
+{
+    mIfps = ifps;
+
+    // Update member variables
+    mSelectedCurve = mCurveManager->selectedCurve();
+    mSelectedControlPoint = mCurveManager->selectedControlPoint();
+    mSelectedColorPoint = mCurveManager->selectedColorPoint();
+    mPixelRatio = mWindow->devicePixelRatio();
+    mSmoothIterations = mRendererManager->smoothIterations();
+
+    // Update
+    mCamera->update(ifps);
+    mCamera->setPixelRatio(mPixelRatio);
+    mRendererManager->setRenderMode(mRenderMode);
+    mRendererManager->setPixelRatio(mPixelRatio);
+    mCurveManager->sortCurves();
+
+    if (mSelectedCurve)
+    {
+        mControlPoints = mSelectedCurve->controlPoints();
+        mColorPoints = mSelectedCurve->getAllColorPoints();
+    } else
+    {
+        if (mMode == Mode::AddColorPoint)
+            mMode = Mode::Select;
+
+        mControlPoints.clear();
+        mColorPoints.clear();
+    }
+
+    // Render
+    mRendererManager->render();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, mPixelRatio * mWidth, mPixelRatio * mHeight);
+
+    drawPainter();
+    drawGUI();
+
+    // ImGui Stuff
+    mImGuiWantsMouseCapture = ImGui::GetIO().WantCaptureMouse;
+    mImGuiWantsKeyboardCapture = ImGui::GetIO().WantCaptureKeyboard;
+}
+
+void Controller::drawGUI()
+{
+    QtImGui::newFrame();
+
+    ImGui::SetNextWindowSize(ImVec2(420, 820), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Controls", NULL, ImGuiWindowFlags_MenuBar);
+
+    // Menu
+    if (ImGui::BeginMenuBar())
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Load from XML"))
+                onAction(Action::ShowLoadFromXMLDialog);
+
+            if (ImGui::MenuItem("Load from JSON"))
+                onAction(Action::ShowLoadFromJSONDialog);
+
+            ImGui::Separator();
+
+            if (ImGui::MenuItem("Save as PNG"))
+                onAction(Action::ShowSaveAsPNGDialog);
+
+            if (ImGui::MenuItem("Save as JSON"))
+                onAction(Action::ShowSaveAsJSONDialog);
+
+            ImGui::EndMenu();
         }
-        break;
-    }
-    case Action::SaveAsPng: {
-        ColorPoint *colorPoint = mCurveContainer->selectedColorPoint();
-        ControlPoint *controlPoint = mCurveContainer->selectedControlPoint();
-        Curve *curve = mCurveContainer->selectedCurve();
-
-        mCurveContainer->setSelectedColorPoint(nullptr);
-        mCurveContainer->setSelectedControlPoint(nullptr);
-        mCurveContainer->setSelectedCurve(nullptr);
-
-        mWindow->setPath(value.toString());
-        mWindow->setSave(true);
-
-        mCurveContainer->setSelectedColorPoint(colorPoint);
-        mCurveContainer->setSelectedControlPoint(controlPoint);
-        mCurveContainer->setSelectedCurve(curve);
-        break;
+        ImGui::EndMenuBar();
     }
 
-    case Action::LoadFromJson: {
-        QVector<Curve *> curves = Util::loadCurveDataFromJson(value.toString());
-        if (!curves.isEmpty()) {
-            mCurveContainer->setSelectedColorPoint(nullptr);
-            mCurveContainer->setSelectedControlPoint(nullptr);
-            mCurveContainer->setSelectedCurve(nullptr);
-            mCurveContainer->clear();
-            mCurveContainer->addCurves(curves);
-        }
-        break;
+    // Action Modes
+    {
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Actions Modes");
+
+        int mode = (int) mMode;
+        ImGui::RadioButton("Select", &mode, 0);
+        ImGui::RadioButton("Add Control Point (Ctrl)", &mode, 1);
+        ImGui::BeginDisabled(!mSelectedCurve);
+        ImGui::RadioButton("Add Color Point (Alt)", &mode, 2);
+        ImGui::EndDisabled();
+        mMode = Mode(mode);
     }
-    case Action::SaveAsJson: {
-        Util::saveCurveDataToJson(mCurveContainer->getCurves(), value.toString());
-        break;
+
+    ImGui::Spacing();
+
+    // Render Settings
+    {
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Render Settings");
+        bool b0 = mRenderMode == RenderMode::Contour;
+        bool b1 = mRenderMode == RenderMode::Diffusion;
+        bool b2 = mRenderMode == RenderMode::ContourAndDiffusion;
+
+        if (ImGui::Checkbox("Contours", &b0))
+            mRenderMode = RenderMode::Contour;
+
+        if (ImGui::Checkbox("Diffusion", &b1))
+            mRenderMode = RenderMode::Diffusion;
+
+        if (ImGui::Checkbox("Contours and Diffusion", &b2))
+            mRenderMode = RenderMode::ContourAndDiffusion;
+
+        if (ImGui::SliderInt("Smooth Iterations", &mSmoothIterations, 2, 50))
+            mRendererManager->setSmoothIterations(mSmoothIterations);
+
+        if (ImGui::SliderFloat("Global Thickness", &mGlobalContourThickness, 2, 10))
+            mCurveManager->setGlobalContourThickness(mGlobalContourThickness);
+
+        if (ImGui::SliderFloat("Global Diffusion Width", &mGlobalDiffusionWidth, 2, 10))
+            mCurveManager->setGlobalDiffusionWidth(mGlobalDiffusionWidth);
+
+        if (ImGui::ColorEdit4("Global Contour Color", &mGlobalContourColor[0]))
+            mCurveManager->setGlobalContourColor(mGlobalContourColor);
     }
-    case Action::UpdateRenderQuality:
-        mRendererManager->onRenderQualityChanged((RenderQuality) value.toInt());
-        mWindow->setRenderQuality((RenderQuality) value.toInt());
-        break;
-    case Action::UpdateContourThickness:
-        mRendererManager->onContourThicknessChanged(value.toFloat());
-        break;
-    case Action::UpdateDiffusionWidth:
-        mRendererManager->onDiffusionWidthChanged(value.toFloat());
-        break;
-    case Action::UpdateContourColor:
-        mRendererManager->onContourColorChanged(value.toVector4D());
-        break;
-    case Action::UpdateSmoothIterations:
-        mRendererManager->onSmoothIterationsChanged(value.toInt());
-        break;
-    case Action::AddColorPoint: {
-        if (mCurveContainer->selectedCurve() && mCurveContainer->selectedCurve()->getSize() >= 2) {
-            QVector2D nearbyPosition = value.toVector2D();
-            float parameter = mCurveContainer->selectedCurve()->parameterAt(nearbyPosition);
-            QVector3D positionOnCurve = mCurveContainer->selectedCurve()->valueAt(parameter).toVector3D();
-            QVector3D tangent = mCurveContainer->selectedCurve()->tangentAt(parameter).toVector3D();
-            QVector3D direction = (nearbyPosition.toVector3D() - positionOnCurve).normalized();
-            QVector3D cross = QVector3D::crossProduct(tangent, direction);
 
-            ColorPoint::Type type = cross.z() > 0 ? ColorPoint::Left : ColorPoint::Right;
+    ImGui::Spacing();
 
-            ColorPoint *colorPoint = new ColorPoint;
-            colorPoint->setParent(mCurveContainer->selectedCurve());
-            colorPoint->setPosition(parameter);
-            colorPoint->setType(type);
-            colorPoint->setColor(QVector4D(1, 1, 1, 1));
-
-            if (mCurveContainer->selectedCurve()->addColorPoint(colorPoint)) {
-                mCurveContainer->setSelectedColorPoint(colorPoint);
-                mCurveContainer->setSelectedControlPoint(nullptr);
-            } else {
-                colorPoint->deleteLater();
-            }
-        }
-        break;
+    // Curve
+    if (mSelectedCurve)
+    {
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Curve");
+        ImGui::Text("Number of Control Points: %d", (int) mSelectedCurve->controlPoints().size());
+        ImGui::Text("Number of Color Points: %d", (int) mSelectedCurve->getAllColorPoints().size());
+        ImGui::InputInt("Depth", &mSelectedCurve->mDepth);
+        ImGui::SliderFloat("Thickness", &mSelectedCurve->mContourThickness, 2, 50);
+        ImGui::SliderFloat("Diffusion Width", &mSelectedCurve->mDiffusionWidth, 2, 50);
+        ImGui::ColorEdit4("Contour Color", &mSelectedCurve->mContourColor[0]);
+        if (ImGui::Button("Remove Curve"))
+            onAction(Action::RemoveCurve);
     }
-    case Action::RemoveColorPoint: {
-        ColorPoint *selectedColorPoint = mCurveContainer->selectedColorPoint();
 
-        Curve *selectedCurve = mCurveContainer->selectedCurve();
-        if (selectedCurve && selectedColorPoint) {
-            selectedCurve->removeColorPoint(selectedColorPoint);
-            mCurveContainer->setSelectedColorPoint(nullptr);
-        }
-        break;
+    ImGui::Spacing();
+
+    // Control Point
+    if (mSelectedControlPoint)
+    {
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Control Point");
+        ImGui::InputFloat2("Position (x,y)", &mSelectedControlPoint->mPosition[0]);
+        if (ImGui::Button("Remove Control Point"))
+            onAction(Action::RemoveControlPoint);
     }
-    case Action::UpdateColorPointColor: {
-        ColorPoint *selectedColorPoint = mCurveContainer->selectedColorPoint();
-        if (selectedColorPoint)
-            selectedColorPoint->setColor(value.toVector4D());
 
-        break;
+    ImGui::Spacing();
+
+    // Color Point
+    if (mSelectedColorPoint)
+    {
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Color Point");
+
+        ImGui::Text("Direction: %s", mSelectedColorPoint->mDirection == ColorPoint::Direction::Left ? "Left" : "Right");
+        ImGui::SliderFloat("Position", &mSelectedColorPoint->mPosition, 0.0f, 1.0f);
+        ImGui::ColorEdit4("Color", &mSelectedColorPoint->mColor[0]);
+
+        if (ImGui::Button("Remove Color Point"))
+            onAction(Action::RemoveColorPoint);
     }
-    case Action::UpdateColorPointPosition: {
-        ColorPoint *selectedColorPoint = mCurveContainer->selectedColorPoint();
-        if (selectedColorPoint)
-            selectedColorPoint->setPosition(value.toFloat());
 
-        break;
-    }
-    case Action::Select: {
-        if (mCurveContainer->selectedCurve()) {
-            QVector2D nearbyPoint = value.toVector2D();
-            ControlPoint *controlPoint = mCurveContainer->getClosestControlPointOnSelectedCurve(nearbyPoint, 5);
-            ColorPoint *colorPoint = mCurveContainer->getClosestColorPointOnSelectedCurve(nearbyPoint, 5);
+    ImGui::Spacing();
 
-            if (controlPoint && colorPoint) {
-                float distanceToControlPoint = nearbyPoint.distanceToPoint(controlPoint->position());
-                float distanceToColorPoint = nearbyPoint.distanceToPoint(colorPoint->getPosition2D());
+    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Info");
+    ImGui::Text("Number of Curves: %d", (int) mCurveManager->curves().size());
+    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
-                mCurveContainer->setSelectedControlPoint(distanceToColorPoint > distanceToControlPoint ? controlPoint : nullptr);
-                mCurveContainer->setSelectedColorPoint(distanceToColorPoint < distanceToControlPoint ? colorPoint : nullptr);
-                return;
-            } else if (controlPoint) {
-                mCurveContainer->setSelectedControlPoint(controlPoint);
-                mCurveContainer->setSelectedColorPoint(nullptr);
-                return;
-            } else if (colorPoint) {
-                mCurveContainer->setSelectedControlPoint(nullptr);
-                mCurveContainer->setSelectedColorPoint(colorPoint);
-                return;
-            } else {
-                mCurveContainer->setSelectedControlPoint(nullptr);
-                mCurveContainer->setSelectedColorPoint(nullptr);
-            }
-        }
+    if (ImGui::Button("Clear Canvas"))
+        onAction(Action::ClearCanvas);
 
-        Curve *selectedCurve = mCurveContainer->selectCurve(value.toVector2D(), 10 * mProjectionParameters->zoomRatio);
-        mMousePressedOnCurve = selectedCurve ? true : false;
-        mCurveContainer->setSelectedCurve(selectedCurve);
+    ImGui::End();
 
-        break;
-    }
-    case Action::AppendControlPoint:
-    case Action::InsertControlPoint: {
-        if (mCurveContainer->selectedCurve()) {
-            if (mCurveContainer->selectedCurve()->getSize() >= Constants::MAX_CONTROL_POINT_COUNT)
-                return;
+    ImGui::Render();
+    QtImGui::render();
+}
 
-            ControlPoint *controlPoint = new ControlPoint(value.toVector2D());
-            controlPoint->setSelected(true);
-            mCurveContainer->selectedCurve()->addControlPoint(controlPoint, action == Action::AppendControlPoint);
-            mCurveContainer->setSelectedControlPoint(controlPoint);
-            mCurveContainer->setSelectedColorPoint(nullptr);
-        } else {
-            ControlPoint *controlPoint = new ControlPoint(value.toVector2D());
-            controlPoint->setSelected(true);
+void Controller::drawPainter()
+{
+    // QPainter stuff
+    if (mSelectedCurve)
+    {
+        mDashedPen.setColor(QColor(0, 0, 0));
+        mSolidPen.setColor(QColor(0, 0, 0));
 
-            Bezier *curve = new Bezier();
-            curve->addControlPoint(controlPoint);
-            mCurveContainer->addCurve(curve);
-            mCurveContainer->setSelectedCurve(curve);
-            mCurveContainer->setSelectedControlPoint(controlPoint);
-            mCurveContainer->setSelectedColorPoint(nullptr);
-        }
+        QOpenGLPaintDevice device(mPixelRatio * mWidth, mPixelRatio * mHeight);
+        QPainter painter(&device);
+        painter.setRenderHint(QPainter::Antialiasing, true);
 
-        break;
-    }
-    case Action::Move: {
-        if (mCurveContainer->selectedCurve())
-            mCurveContainer->selectedCurve()->translate(value.toVector2D());
-        break;
-    }
-    case Action::Pan: {
-        QVector2D translation = value.toVector2D();
-        mProjectionParameters->left += translation.x();
-        mProjectionParameters->right += translation.x();
-        mProjectionParameters->top += translation.y();
-        mProjectionParameters->bottom += translation.y();
-        break;
-    }
-    case Action::RemoveCurve: {
-        if (mCurveContainer->selectedCurve()) {
-            mCurveContainer->removeCurve(mCurveContainer->selectedCurve());
-            mCurveContainer->setSelectedControlPoint(nullptr);
-            mCurveContainer->setSelectedCurve(nullptr);
-        }
-        break;
-    }
-    case Action::RemoveControlPoint: {
-        ControlPoint *selectedControlPoint = mCurveContainer->selectedControlPoint();
-        Curve *selectedCurve = mCurveContainer->selectedCurve();
-        if (selectedCurve && selectedControlPoint) {
-            selectedCurve->removeControlPoint(selectedControlPoint);
-            mCurveContainer->setSelectedControlPoint(nullptr);
-
-            if (selectedCurve->getSize() == 0) {
-                mCurveContainer->setSelectedCurve(nullptr);
-                mCurveContainer->removeCurve(selectedCurve);
-            }
+        // Control polygon
+        painter.setPen(mDashedPen);
+        painter.setBrush(QBrush());
+        for (int i = 0; i < mControlPoints.size() - 1; ++i)
+        {
+            QPointF p0 = mCamera->toGUI(mControlPoints[i]->mPosition);
+            QPointF p1 = mCamera->toGUI(mControlPoints[i + 1]->mPosition);
+            painter.drawLine(p0, p1);
         }
 
-        break;
-    }
-    case Action::UpdateControlPointPosition: {
-        if (mCurveContainer->selectedControlPoint())
-            mCurveContainer->selectedControlPoint()->setPosition(value.toVector2D());
+        // Control Points
+        for (int j = 0; j < mControlPoints.size(); ++j)
+        {
+            QPointF center = mCamera->toGUI(mControlPoints[j]->mPosition);
+            painter.setPen(QColor(0, 0, 0, 0));
 
-        break;
-    }
-    case Action::UpdateControlPointXPosition: {
-        if (mCurveContainer->selectedControlPoint()) {
-            QVector2D position = mCurveContainer->selectedControlPoint()->position();
-            position.setX(value.toFloat());
-            mCurveContainer->selectedControlPoint()->setPosition(position);
-        }
-        break;
-    }
-    case Action::UpdateControlPointYPosition: {
-        if (mCurveContainer->selectedControlPoint()) {
-            QVector2D position = mCurveContainer->selectedControlPoint()->position();
-            position.setY(value.toFloat());
-            mCurveContainer->selectedControlPoint()->setPosition(position);
-        }
-        break;
-    }
-    case Action::UpdateCurveZIndex: {
-        if (mCurveContainer->selectedCurve()) {
-            mCurveContainer->selectedCurve()->setZ(value.toInt());
-            mCurveContainer->sortCurves();
-        }
-        break;
-    }
+            // Outer disk
+            float outerRadius = mControlPoints[j]->mSelected ? 16 : 12;
+            outerRadius = qMin(outerRadius, outerRadius / mCamera->zoom());
+            painter.setBrush(QColor(128, 128, 128, 128));
+            painter.drawEllipse(center, outerRadius, outerRadius);
 
-    case Action::ZoomIn: {
-        zoom(mProjectionParameters->zoomRatio / mZoomStep, value);
+            // Inner disk
+            float innerRadius = 6;
+            innerRadius = qMin(innerRadius, innerRadius / mCamera->zoom());
+            painter.setBrush(QColor(255, 255, 255));
+            painter.drawEllipse(center, innerRadius, innerRadius);
+        }
 
-        break;
+        // Color Points
+
+        for (int i = 0; i < mColorPoints.size(); ++i)
+        {
+            QPointF center = mCamera->toGUI(mColorPoints[i]->getPosition2D());
+            painter.setPen(QColor(0, 0, 0, 0));
+
+            // Outer disk
+            float outerRadius = mColorPoints[i]->mSelected ? 16 : 12;
+            outerRadius = qMin(outerRadius, outerRadius / mCamera->zoom());
+            painter.setBrush(QColor(0, 0, 0, 128));
+            painter.drawEllipse(center, outerRadius, outerRadius);
+
+            // Inner disk
+            float innerRadius = 6;
+            innerRadius = qMin(innerRadius, innerRadius / mCamera->zoom());
+            painter.setBrush(QColor(255 * mColorPoints[i]->mColor.x(), //
+                                    255 * mColorPoints[i]->mColor.y(),
+                                    255 * mColorPoints[i]->mColor.z(),
+                                    255 * mColorPoints[i]->mColor.w()));
+            painter.drawEllipse(center, innerRadius, innerRadius);
+        }
     }
-    case Action::ZoomOut: {
-        zoom(mProjectionParameters->zoomRatio * mZoomStep, value);
-        break;
-    }
-    }
+}
+
+void Controller::setWindow(Window *newWindow)
+{
+    mWindow = newWindow;
 }
 
 void Controller::onWheelMoved(QWheelEvent *event)
 {
-    int delta = event->angleDelta().y();
-
-    if (delta < 0)
-        onAction(Action::ZoomOut, event->position().toPoint());
-    if (delta > 0)
-        onAction(Action::ZoomIn, event->position().toPoint());
+    mCamera->onWheelMoved(event);
 }
 
 void Controller::onMousePressed(QMouseEvent *event)
 {
-    mMouseLeftButtonPressed = event->button() == Qt::LeftButton;
-    mMouseMiddleButtonPressed = event->button() == Qt::MiddleButton;
-    mMouseRightButtonPressed = event->button() == Qt::RightButton;
-    mModeBeforeMousePress = mMode;
+    if (mImGuiWantsMouseCapture)
+        return;
 
-    if (mMouseLeftButtonPressed) {
-        switch (mMode) {
-        case Mode::Select:
-        case Mode::AppendControlPoint:
-        case Mode::InsertControlPoint:
-        case Mode::AddColorPoint: {
-            onAction((Action) mMode, mTransformer->mapFromGuiToOpenGL(mMousePosition));
-            break;
-        }
-        default: {
-            break;
-        }
-        }
+    mPressedButton = event->button();
+
+    if (event->button() == Qt::LeftButton)
+    {
+        onAction((Action) mMode, mCamera->toOpenGL(event->position()));
+
+    } else if (event->button() == Qt::MiddleButton)
+    {
+        mCamera->onMousePressed(event);
     }
-
-    if (mMouseMiddleButtonPressed)
-        onAction(Action::UpdateMode, (int) Mode::Pan);
-
-    if (mMouseRightButtonPressed)
-        onAction(Action::UpdateMode, (int) Mode::MoveCurve);
 }
 
 void Controller::onMouseReleased(QMouseEvent *event)
 {
-    if (mMouseMiddleButtonPressed)
-        onAction(Action::UpdateMode, (int) mModeBeforeMousePress);
+    mPressedButton = Qt::NoButton;
 
-    if (mMouseRightButtonPressed)
-        onAction(Action::UpdateMode, (int) mModeBeforeMousePress);
-
-    mMouseLeftButtonPressed = false;
-    mMouseMiddleButtonPressed = false;
-    mMouseRightButtonPressed = false;
+    mCamera->onMouseReleased(event);
 }
 
 void Controller::onMouseMoved(QMouseEvent *event)
 {
-    switch (mMode) {
-    case Mode::AddColorPoint:
-        break;
-
-    case Mode::Pan: {
-        QVector2D translation = QVector2D(mMousePosition - event->pos()) * mProjectionParameters->zoomRatio;
-        onAction(Action::Pan, translation);
-        break;
-    }
-
-    case Mode::Select: {
-        QVector2D position = mTransformer->mapFromGuiToOpenGL(event->pos());
-        if (mMouseLeftButtonPressed) {
-            if (mCurveContainer->selectedControlPoint()) {
-                onAction(Action::UpdateControlPointPosition, position);
-            } else if (mCurveContainer->selectedColorPoint()) {
-                if (mCurveContainer->selectedCurve()) {
-                    onAction(Action::UpdateColorPointPosition, mCurveContainer->selectedCurve()->parameterAt(position, 10000));
-                }
-            }
-        }
-        break;
-    }
-
-    case Mode::MoveCurve: {
-        if (mMouseRightButtonPressed || mMouseLeftButtonPressed) {
-            if (mCurveContainer->selectedCurve()) {
-                QVector2D translation = QVector2D(event->pos() - mMousePosition) * mProjectionParameters->zoomRatio;
-                onAction(Action::Move, translation);
-
-            } else {
-                QVector2D position = mTransformer->mapFromGuiToOpenGL(mMousePosition);
-                onAction(Action::Select, position);
-            }
-        }
-
-        break;
-    }
-    default:
-        break;
-    }
-
-    mMousePosition = event->pos();
-}
-
-bool Controller::cursorInsideBoundingBox(QPointF position, QMarginsF margins)
-{
-    if (mCurveContainer->selectedCurve()) {
-        QRectF boundingBox = mCurveContainer->selectedCurve()->getBoundingBox();
-        boundingBox = boundingBox.marginsAdded(margins);
-        return boundingBox.contains(mTransformer->mapFromGuiToOpenGL(position).toPointF());
-    } else
-        return false;
-}
-
-void Controller::zoom(float newZoomRatio, CustomVariant cursorPositionVariant)
-{
-    if (qFuzzyCompare(newZoomRatio, mProjectionParameters->zoomRatio))
+    if (mImGuiWantsMouseCapture)
         return;
 
-    QPoint cursorPosition;
-    float width = mWindow->width();
-    float height = mWindow->height();
+    if (mPressedButton == Qt::LeftButton)
+    {
+        if (mMode == Mode::Select)
+        {
+            if (mSelectedColorPoint)
+                onAction(Action::UpdateColorPointPosition, mCamera->toOpenGL(event->position()));
 
-    if (cursorPositionVariant.isValid())
-        cursorPosition = cursorPositionVariant.toPoint();
-    else
-        cursorPosition = QPoint(width / 2, height / 2);
+            if (mSelectedControlPoint)
+                onAction(Action::UpdateControlPointPosition, mCamera->toOpenGL(event->position()));
+        }
+    }
 
-    QVector2D positionBeforeZoom = mTransformer->mapFromGuiToOpenGL(cursorPosition);
+    mCamera->onMouseMoved(event);
+}
 
-    if (newZoomRatio >= 2)
-        newZoomRatio = 2;
-    if (newZoomRatio <= 1 / 16.0)
-        newZoomRatio = 1 / 16.0f;
+void Controller::onKeyPressed(QKeyEvent *event)
+{
+    if (mImGuiWantsKeyboardCapture)
+        return;
 
-    mProjectionParameters->zoomRatio = newZoomRatio;
+    if (event->key() == Qt::Key_Delete)
+    {
+        if (mSelectedColorPoint)
+            onAction(Action::RemoveColorPoint);
+        else if (mSelectedControlPoint)
+            onAction(Action::RemoveControlPoint);
+        else if (mSelectedCurve)
+            onAction(Action::RemoveCurve);
+    } else if (event->key() == Qt::Key_Alt)
+    {
+        if (mSelectedCurve)
+            mMode = Mode::AddColorPoint;
+    } else if (event->key() == Qt::Key_Control)
+    {
+        mMode = Mode::AddControlPoint;
+    }
+}
 
-    // Zoom
-    mProjectionParameters->right = mProjectionParameters->left + width * mProjectionParameters->zoomRatio;
-    mProjectionParameters->bottom = mProjectionParameters->top + height * mProjectionParameters->zoomRatio;
+void Controller::onKeyReleased(QKeyEvent *)
+{
+    if (mImGuiWantsKeyboardCapture)
+        return;
+}
 
-    QVector2D positionAfterZoom = mTransformer->mapFromGuiToOpenGL(cursorPosition);
-
-    float dx = positionBeforeZoom.x() - positionAfterZoom.x();
-    float dy = positionBeforeZoom.y() - positionAfterZoom.y();
-
-    mProjectionParameters->left += dx;
-    mProjectionParameters->right += dx;
-    mProjectionParameters->bottom += dy;
-    mProjectionParameters->top += dy;
+void Controller::resize(int w, int h)
+{
+    mWindow->makeCurrent();
+    mWidth = w;
+    mHeight = h;
+    mCamera->resize(w, h);
+    mRendererManager->resize(w, h);
+    mWindow->doneCurrent();
 }

@@ -1,14 +1,19 @@
 #ifndef HELPER_H
 #define HELPER_H
 
-#include <QString>
+#include "Bezier.h"
+
+#include <QByteArray>
 
 class Helper
 {
-public:
     Helper();
 
+public:
     static QByteArray getBytes(QString path);
+    static QVector<Bezier *> loadCurveDataFromXML(const QString &filename);
+    static QVector<Bezier *> loadCurveDataFromJSON(const QString &filename);
+    static bool saveCurveDataToJSON(const QVector<Bezier *> &curves, const QString &filename);
 };
 
 #endif // HELPER_H

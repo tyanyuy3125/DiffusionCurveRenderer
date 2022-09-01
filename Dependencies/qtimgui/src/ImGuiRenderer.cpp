@@ -330,6 +330,7 @@ void ImGuiRenderer::newFrame()
     // Setup time step
     double current_time =  QDateTime::currentMSecsSinceEpoch() / double(1000);
     io.DeltaTime = g_Time > 0.0 ? (float)(current_time - g_Time) : (float)(1.0f/60.0f);
+    if (io.DeltaTime <= 0.0f) io.DeltaTime = 0.00001f;
     g_Time = current_time;
     
     
@@ -405,7 +406,7 @@ void ImGuiRenderer::onWheel(QWheelEvent *event)
         g_MouseWheelH += event->pixelDelta().x() / (ImGui::GetTextLineHeight());
     } else {
         // Magic number of 120 comes from Qt doc on QWheelEvent::pixelDelta()
-        g_MouseWheelH += event->angleDelta().x() / 120;
+        g_MouseWheelH += event->angleDelta().x() / 120.0f;
     }
 
     // Handle vertical component
@@ -415,7 +416,7 @@ void ImGuiRenderer::onWheel(QWheelEvent *event)
         g_MouseWheel += event->pixelDelta().y() / (5.0 * ImGui::GetTextLineHeight());
     } else {
         // Magic number of 120 comes from Qt doc on QWheelEvent::pixelDelta()
-        g_MouseWheel += event->angleDelta().y() / 120;
+        g_MouseWheel += event->angleDelta().y() / 120.0f;
     }
 }
 

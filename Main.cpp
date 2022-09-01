@@ -1,25 +1,21 @@
-#include "Controller.h"
+#include "Window.h"
 
 #include <QApplication>
-#include <QDebug>
-#include <QFile>
-#include <QFontDatabase>
-#include <QScreen>
-#include <QStyleFactory>
-#include <QSurfaceFormat>
-#include <QUrl>
 
 int main(int argc, char *argv[])
 {
-    QApplication app(argc, argv);
+    QApplication a(argc, argv);
 
-    QSurfaceFormat format;
-    format.setSamples(16);
+    QSurfaceFormat format = QSurfaceFormat::defaultFormat();
+    format.setMajorVersion(4);
+    format.setMinorVersion(3);
+    format.setSamples(8);
     format.setProfile(QSurfaceFormat::CoreProfile);
     QSurfaceFormat::setDefaultFormat(format);
 
-    Controller *controller = new Controller;
-    controller->init();
+    Window w;
+    w.resize(1600, 900);
+    w.show();
 
-    return app.exec();
+    return a.exec();
 }

@@ -1,62 +1,85 @@
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 
-#include "CurveContainer.h"
+#include "Camera.h"
+#include "Common.h"
+#include "CurveManager.h"
 #include "CustomVariant.h"
-#include "Transformer.h"
-#include "Types.h"
-#include "Window.h"
+#include "RendererManager.h"
+#include "ShaderManager.h"
 
-#include <Curves/Curve.h>
-#include <Renderers/RendererManager.h>
-
-#include <QFileDialog>
 #include <QObject>
-#include <QVariant>
 
-class Controller : public QObject
+#include <imgui.h>
+#include <QFileDialog>
+#include <QPen>
+#include <QtImGui.h>
+
+class Window;
+
+class Controller : public QObject, protected QOpenGLExtraFunctions
 {
     Q_OBJECT
 public:
     explicit Controller(QObject *parent = nullptr);
+    virtual ~Controller();
 
-public slots:
     void onAction(Action action, CustomVariant value = CustomVariant());
-    void init();
 
-private slots:
+    void init();
     void onWheelMoved(QWheelEvent *event);
     void onMousePressed(QMouseEvent *event);
     void onMouseReleased(QMouseEvent *event);
     void onMouseMoved(QMouseEvent *event);
+    void onKeyPressed(QKeyEvent *event);
+    void onKeyReleased(QKeyEvent *event);
+    void resize(int w, int h);
+    void render(float ifps);
+    void drawGUI();
+    void drawPainter();
 
-    bool cursorInsideBoundingBox(QPointF position, QMarginsF margins = QMarginsF(-20, -20, 20, 20));
-    void zoom(float newZoomRatio, CustomVariant cursorPositionVariant = CustomVariant());
+    void setWindow(Window *newWindow);
 
 private:
-    Window *mWindow;
-    CurveContainer *mCurveContainer;
-    Transformer *mTransformer;
     RendererManager *mRendererManager;
+    CurveManager *mCurveManager;
+    ShaderManager *mShaderManager;
 
-    ProjectionParameters *mProjectionParameters;
+    QVector<Manager *> mManagers;
 
-    Mode mModeBeforeKeyPress;
-    Mode mModeBeforeMousePress;
+    Window *mWindow;
+    Camera *mCamera;
+
+    float mIfps;
+    bool mImGuiWantsMouseCapture;
+    bool mImGuiWantsKeyboardCapture;
+
     Mode mMode;
+    RenderMode mRenderMode;
+    float mWidth;
+    float mHeight;
+    float mPixelRatio;
 
-    bool mMouseLeftButtonPressed;
-    bool mMouseMiddleButtonPressed;
-    bool mMouseRightButtonPressed;
-    bool mMousePressedOnCurve;
-    QPointF mMousePosition;
+    float mGlobalContourThickness;
+    float mGlobalDiffusionWidth;
+    QVector4D mGlobalContourColor;
 
-    float mZoomStep;
-
-    Qt::Key mPressedKey;
-
+    // GUI
+    QPen mDashedPen;
+    QPen mSolidPen;
+    QPointF mPreviousMousePosition;
+    Qt::MouseButton mPressedButton;
     QFileDialog *mFileDialog;
     Action mLastFileAction;
+
+    // Aux
+    Bezier *mSelectedCurve;
+    ControlPoint *mSelectedControlPoint;
+    ColorPoint *mSelectedColorPoint;
+    QList<ControlPoint *> mControlPoints;
+    QVector<ColorPoint *> mColorPoints;
+
+    int mSmoothIterations;
 };
 
 #endif // CONTROLLER_H
