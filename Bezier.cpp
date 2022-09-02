@@ -444,6 +444,68 @@ QVector2D Bezier::normalAt(float t) const
     return QVector2D(-tangent.y(), tangent.x());
 }
 
+void Bezier::scale(float scaleFactor)
+{
+    for (auto &point : mControlPoints)
+        point->mPosition = scaleFactor * point->mPosition;
+}
+
+Bezier *Bezier::deepCopy()
+{
+    Bezier *newCurve = new Bezier;
+    newCurve->mContourColor = mContourColor;
+    newCurve->mContourThickness = mContourThickness;
+    newCurve->mDiffusionWidth = mDiffusionWidth;
+    newCurve->mSelected = mSelected;
+    newCurve->mDepth = mDepth;
+
+    for (const auto &point : mControlPoints)
+    {
+        ControlPoint *newPoint = new ControlPoint;
+        newPoint->mPosition = point->mPosition;
+        newPoint->mSelected = point->mSelected;
+
+        newCurve->addControlPoint(newPoint);
+    }
+
+    for (const auto &point : mLeftColorPoints)
+    {
+        ColorPoint *newPoint = new ColorPoint;
+        newPoint->mPosition = point->mPosition;
+        newPoint->mSelected = point->mSelected;
+        newPoint->mColor = point->mColor;
+        newPoint->mDirection = point->mDirection;
+        newPoint->setParent(newCurve);
+
+        newCurve->addColorPoint(newPoint);
+    }
+
+    for (const auto &point : mRightColorPoints)
+    {
+        ColorPoint *newPoint = new ColorPoint;
+        newPoint->mPosition = point->mPosition;
+        newPoint->mSelected = point->mSelected;
+        newPoint->mColor = point->mColor;
+        newPoint->mDirection = point->mDirection;
+        newPoint->setParent(newCurve);
+
+        newCurve->addColorPoint(newPoint);
+    }
+
+    for (const auto &point : mBlurPoints)
+    {
+        BlurPoint *newPoint = new BlurPoint;
+        newPoint->mPosition = point->mPosition;
+        newPoint->mSelected = point->mSelected;
+        newPoint->mStrength = point->mStrength;
+        newPoint->setParent(newCurve);
+
+        newCurve->addBlurPoint(newPoint);
+    }
+
+    return newCurve;
+}
+
 QVector<float> Bezier::getCoefficients() const
 {
     QVector<float> coefficients;

@@ -56,6 +56,9 @@ public:
     QVector2D valueAt(float t) const override;
     QVector2D tangentAt(float t) const override;
     QVector2D normalAt(float t) const override;
+    void scale(float scaleFactor);
+
+    Bezier *deepCopy();
 
     const QList<ControlPoint *> &controlPoints() const;
     const QList<ColorPoint *> &leftColorPoints() const;
