@@ -308,6 +308,9 @@ void Controller::drawGUI()
         if (ImGui::SliderInt("Smooth Iterations", &mSmoothIterations, 2, 50))
             mRendererManager->setSmoothIterations(mSmoothIterations);
 
+        if (ImGui::SliderFloat("Global Blur Strength", &mGlobalBlurStrength, 0.0f, 1.0f))
+            mCurveManager->setGlobalBlurStrength(mGlobalBlurStrength);
+
         if (ImGui::SliderFloat("Global Thickness", &mGlobalContourThickness, 2, 10))
             mCurveManager->setGlobalContourThickness(mGlobalContourThickness);
 

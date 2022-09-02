@@ -46,6 +46,9 @@ bool ShaderManager::init()
         shader->addUniform("rightColors");
         shader->addUniform("rightColorPositions");
         shader->addUniform("rightColorsCount");
+        shader->addUniform("blurPointPositions");
+        shader->addUniform("blurPointStrengths");
+        shader->addUniform("blurPointsCount");
         shader->addAttribute("point");
 
         if (!shader->init())
@@ -74,7 +77,8 @@ bool ShaderManager::init()
         mShaders.insert(shader->type(), shader);
         shader->addPath(QOpenGLShader::Vertex, ":/Resources/Shaders/Downsample.vert");
         shader->addPath(QOpenGLShader::Fragment, ":/Resources/Shaders/Downsample.frag");
-        shader->addUniform("sourceTexture");
+        shader->addUniform("colorTexture");
+        shader->addUniform("blurTexture");
         shader->addAttribute("position");
         shader->addAttribute("textureCoords");
 
@@ -88,8 +92,11 @@ bool ShaderManager::init()
         mShaders.insert(shader->type(), shader);
         shader->addPath(QOpenGLShader::Vertex, ":/Resources/Shaders/Upsample.vert");
         shader->addPath(QOpenGLShader::Fragment, ":/Resources/Shaders/Upsample.frag");
-        shader->addUniform("sourceTexture");
-        shader->addUniform("targetTexture");
+        shader->addUniform("colorSourceTexture");
+        shader->addUniform("colorTargetTexture");
+        shader->addUniform("blurSourceTexture");
+        shader->addUniform("blurTargetTexture");
+
         shader->addAttribute("position");
         shader->addAttribute("textureCoords");
 
@@ -103,8 +110,10 @@ bool ShaderManager::init()
         mShaders.insert(shader->type(), shader);
         shader->addPath(QOpenGLShader::Vertex, ":/Resources/Shaders/Jacobi.vert");
         shader->addPath(QOpenGLShader::Fragment, ":/Resources/Shaders/Jacobi.frag");
-        shader->addUniform("constrainedTexture");
-        shader->addUniform("targetTexture");
+        shader->addUniform("colorConstrainedTexture");
+        shader->addUniform("colorTargetTexture");
+        shader->addUniform("blurConstrainedTexture");
+        shader->addUniform("blurTargetTexture");
         shader->addAttribute("position");
         shader->addAttribute("textureCoords");
 
@@ -116,17 +125,36 @@ bool ShaderManager::init()
     {
         Shader *shader = new Shader(ShaderType::BlurShader);
         mShaders.insert(shader->type(), shader);
-
         shader->addPath(QOpenGLShader::Vertex, ":/Resources/Shaders/Blur.vert");
         shader->addPath(QOpenGLShader::Fragment, ":/Resources/Shaders/Blur.frag");
-
-        shader->addUniform("screenTexture");
-        shader->addUniform("horizontal");
-        shader->addUniform("width");
-        shader->addUniform("height");
-
+        shader->addUniform("colorTexture");
+        shader->addUniform("blurTexture");
+        shader->addUniform("widthRatio");
+        shader->addUniform("heightRatio");
         shader->addAttribute("position");
         shader->addAttribute("textureCoords");
+
+        if (!shader->init())
+            return false;
+    }
+
+    // Last Pass Blur Shader
+    {
+        Shader *shader = new Shader(ShaderType::LastPassBlurShader);
+        mShaders.insert(shader->type(), shader);
+        shader->addPath(QOpenGLShader::Vertex, ":/Resources/Shaders/LastPassBlur.vert");
+        shader->addPath(QOpenGLShader::Fragment, ":/Resources/Shaders/LastPassBlur.frag");
+        shader->addPath(QOpenGLShader::Geometry, ":/Resources/Shaders/LastPassBlur.geom");
+        shader->addUniform("projection");
+        shader->addUniform("pointsDelta");
+        shader->addUniform("diffusionWidth");
+        shader->addUniform("zoom");
+        shader->addUniform("controlPoints");
+        shader->addUniform("controlPointsCount");
+        shader->addUniform("blurPointPositions");
+        shader->addUniform("blurPointStrengths");
+        shader->addUniform("blurPointsCount");
+        shader->addAttribute("point");
 
         if (!shader->init())
             return false;

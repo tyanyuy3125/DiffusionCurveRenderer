@@ -8,7 +8,7 @@
 #define DEFAULT_CONTOUR_THICKNESS 3.0f
 #define DEFAULT_DIFFUSION_WIDTH 3.0f
 #define DEFAULT_CONTOUR_COLOR QVector4D(0, 0, 0, 1)
-#define DEFAULT_BLUR_STRENGTH 0.1f
+#define DEFAULT_BLUR_STRENGTH 0.25f
 
 #define BLUR_POINT_VISUAL_GAP 25.0f
 #define COLOR_POINT_VISUAL_GAP 5.0f
@@ -20,7 +20,8 @@ enum class ShaderType { //
     DownsampleShader,
     UpsampleShader,
     JacobiShader,
-    BlurShader
+    BlurShader,
+    LastPassBlurShader
 };
 
 enum class Mode { //

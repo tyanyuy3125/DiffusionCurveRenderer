@@ -1,14 +1,16 @@
 #version 430 core
 in vec2 fsTextureCoords;
 
-uniform sampler2D sourceTexture;
+uniform sampler2D colorTexture;
+uniform sampler2D blurTexture;
 
-out vec4 outColor;
+layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec4 outBlur;
 
 void main()
 {
-    float uStep = 1.0f / textureSize(sourceTexture, 0).x;
-    float vStep = 1.0f / textureSize(sourceTexture, 0).y;
+    float uStep = 1.0f / textureSize(colorTexture, 0).x;
+    float vStep = 1.0f / textureSize(colorTexture, 0).y;
 
     // nw n ne
     // w  c e
@@ -48,25 +50,52 @@ void main()
     weights[7] = 2; // s
     weights[8] = 1; // se
 
-    vec4 colors[9];
-
-    for (int i = 0; i < 9; i++)
-        colors[i] = texture(sourceTexture, vectors[i]);
-
-    float totalWeight = 0;
-    vec4 color = vec4(0, 0, 0, 0);
-
-    for (int i = 0; i < 9; i++)
+    // Colors
     {
-        if (colors[i].a > 0.1)
+        vec4 colors[9];
+
+        for (int i = 0; i < 9; i++)
+            colors[i] = texture(colorTexture, vectors[i]);
+
+        float colorTotalWeight = 0;
+        vec4 color = vec4(0);
+        for (int i = 0; i < 9; i++)
         {
-            color += weights[i] * colors[i];
-            totalWeight += weights[i];
+            if (colors[i].a > 0.1f)
+            {
+                color += weights[i] * colors[i];
+                colorTotalWeight += weights[i];
+            }
         }
+
+        if (colorTotalWeight > 0)
+            outColor = color / colorTotalWeight;
+        else
+            outColor = vec4(0, 0, 0, 0);
     }
 
-    if (totalWeight > 0)
-        outColor = color / totalWeight;
-    else
-        outColor = vec4(0, 0, 0, 0);
+    // Blur
+    {
+        vec4 blurs[9];
+
+        for (int i = 0; i < 9; i++)
+            blurs[i] = texture(blurTexture, vectors[i]);
+
+
+        float blurTotalWeight = 0;
+        vec4 blur = vec4(0);
+        for (int i = 0; i < 9; i++)
+        {
+            if (blurs[i].a > 0.1f)
+            {
+                blur += weights[i] * blurs[i];
+                blurTotalWeight += weights[i];
+            }
+        }
+
+        if (blurTotalWeight > 0)
+            outBlur = blur / blurTotalWeight;
+        else
+            outBlur = vec4(0, 0, 0, 0);
+    }
 }

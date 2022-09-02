@@ -1,65 +1,71 @@
 #version 430 core
 in vec2 fsTextureCoords;
 
-uniform sampler2D constrainedTexture;
-uniform sampler2D targetTexture;
+uniform sampler2D colorConstrainedTexture;
+uniform sampler2D colorTargetTexture;
 
-out vec4 outColor;
+uniform sampler2D blurConstrainedTexture;
+uniform sampler2D blurTargetTexture;
+
+layout(location = 0) out vec4 outColor;
+layout(location = 1) out vec4 outBlur;
 
 void main()
 {
-    vec4 color = texture(constrainedTexture, fsTextureCoords);
+    float uStep = 1.0f / textureSize(colorConstrainedTexture, 0).x;
+    float vStep = 1.0f / textureSize(colorConstrainedTexture, 0).y;
 
-    if (color.a > 0.1)
+    // nw n ne
+    // w  c e
+    // sw s se
+
+    vec2 nw = vec2(fsTextureCoords.s - uStep, fsTextureCoords.t + vStep);
+    vec2 n = vec2(fsTextureCoords.s, fsTextureCoords.t + vStep);
+    vec2 ne = vec2(fsTextureCoords.s + uStep, fsTextureCoords.t + vStep);
+
+    vec2 w = vec2(fsTextureCoords.s - uStep, fsTextureCoords.t);
+    vec2 c = vec2(fsTextureCoords.s, fsTextureCoords.t);
+    vec2 e = vec2(fsTextureCoords.s + uStep, fsTextureCoords.t);
+
+    vec2 sw = vec2(fsTextureCoords.s - uStep, fsTextureCoords.t - vStep);
+    vec2 s = vec2(fsTextureCoords.s, fsTextureCoords.t - vStep);
+    vec2 se = vec2(fsTextureCoords.s + uStep, fsTextureCoords.t - vStep);
+
+    vec2 vectors[9];
+    vectors[0] = nw;
+    vectors[1] = n;
+    vectors[2] = ne;
+    vectors[3] = w;
+    vectors[4] = c;
+    vectors[5] = e;
+    vectors[6] = sw;
+    vectors[7] = s;
+    vectors[8] = se;
+
+    float weights[9];
+    weights[0] = 1;
+    weights[1] = 2; // n
+    weights[2] = 1;
+    weights[3] = 2; // w
+    weights[4] = 4; // c
+    weights[5] = 2; // e
+    weights[6] = 1;
+    weights[7] = 2; // s
+    weights[8] = 1;
+
+
+    // Colors
+    vec4 color = texture(colorConstrainedTexture, fsTextureCoords);
+
+    if (color.a > 0.1f)
     {
         outColor = color;
     } else
     {
-        float uStep = 1.0f / textureSize(constrainedTexture, 0).x;
-        float vStep = 1.0f / textureSize(constrainedTexture, 0).y;
-
-        // nw n ne
-        // w  c e
-        // sw s se
-
-        vec2 nw = vec2(fsTextureCoords.s - uStep, fsTextureCoords.t + vStep);
-        vec2 n = vec2(fsTextureCoords.s, fsTextureCoords.t + vStep);
-        vec2 ne = vec2(fsTextureCoords.s + uStep, fsTextureCoords.t + vStep);
-
-        vec2 w = vec2(fsTextureCoords.s - uStep, fsTextureCoords.t);
-        vec2 c = vec2(fsTextureCoords.s, fsTextureCoords.t);
-        vec2 e = vec2(fsTextureCoords.s + uStep, fsTextureCoords.t);
-
-        vec2 sw = vec2(fsTextureCoords.s - uStep, fsTextureCoords.t - vStep);
-        vec2 s = vec2(fsTextureCoords.s, fsTextureCoords.t - vStep);
-        vec2 se = vec2(fsTextureCoords.s + uStep, fsTextureCoords.t - vStep);
-
-        vec2 vectors[9];
-        vectors[0] = nw;
-        vectors[1] = n;
-        vectors[2] = ne;
-        vectors[3] = w;
-        vectors[4] = c;
-        vectors[5] = e;
-        vectors[6] = sw;
-        vectors[7] = s;
-        vectors[8] = se;
-
-        float weights[9];
-        weights[0] = 1;
-        weights[1] = 2; // n
-        weights[2] = 1;
-        weights[3] = 2; // w
-        weights[4] = 4; // c
-        weights[5] = 2; // e
-        weights[6] = 1;
-        weights[7] = 2; // s
-        weights[8] = 1;
-
         vec4 colors[9];
 
         for (int i = 0; i < 9; i++)
-            colors[i] = texture(targetTexture, vectors[i]);
+            colors[i] = texture(colorTargetTexture, vectors[i]);
 
         float totalWeight = 0;
         vec4 color = vec4(0, 0, 0, 0);
@@ -77,5 +83,37 @@ void main()
             outColor = color / totalWeight;
         else
             outColor = vec4(1, 1, 1, 1);
+    }
+
+
+    // Blur
+    vec4 blur = texture(blurConstrainedTexture, fsTextureCoords);
+
+    if (blur.a > 0.1f)
+    {
+        outBlur = blur;
+    } else
+    {
+        vec4 blurs[9];
+
+        for (int i = 0; i < 9; i++)
+            blurs[i] = texture(blurTargetTexture, vectors[i]);
+
+        float totalWeight = 0;
+        vec4 blur = vec4(0, 0, 0, 0);
+
+        for (int i = 0; i < 9; i++)
+        {
+            if (blurs[i].a > 0)
+            {
+                blur += weights[i] * blurs[i];
+                totalWeight += weights[i];
+            }
+        }
+
+        if (totalWeight > 0)
+            outBlur = blur / totalWeight;
+        else
+            outBlur = vec4(1, 1, 1, 1);
     }
 }

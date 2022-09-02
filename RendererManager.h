@@ -55,12 +55,13 @@ private:
     int mHeight;
     float mPixelRatio;
 
-    QOpenGLFramebufferObjectFormat mDefaultFramebufferFormat;
-    QOpenGLFramebufferObjectFormat mMultisampleFramebufferFormat;
+    QOpenGLFramebufferObjectFormat mFinalFramebufferFormat;            // For mFinalFramebuffer
+    QOpenGLFramebufferObjectFormat mDefaultFramebufferFormat;          // For other FBOs
+    QOpenGLFramebufferObjectFormat mFinalMultisampleFramebufferFormat; // For mFinalMultisampleFramebuffer
 
-    QOpenGLFramebufferObject *mInitialFramebuffer;
-    QOpenGLFramebufferObject *mFinalFramebuffer;
-    QOpenGLFramebufferObject *mFinalMultisampleFramebuffer;
+    QOpenGLFramebufferObject *mInitialFramebuffer;          // Contains initial color and blur info
+    QOpenGLFramebufferObject *mFinalFramebuffer;            // Final single sampled result for colors and blur in order to save the image
+    QOpenGLFramebufferObject *mFinalMultisampleFramebuffer; // We render contours to this FBO
 
     QVector<QOpenGLFramebufferObject *> mDownsampleFramebuffers;
     QVector<QOpenGLFramebufferObject *> mUpsampleFramebuffers;
@@ -70,6 +71,8 @@ private:
 
     bool mSave;
     QString mSavePath;
+
+    GLenum *mDrawBuffers;
 };
 
 #endif // RENDERERMANAGER_H

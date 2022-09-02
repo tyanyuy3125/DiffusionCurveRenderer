@@ -32,5 +32,8 @@
         <file>Resources/Shaders/Jacobi.vert</file>
         <file>Resources/Shaders/Blur.frag</file>
         <file>Resources/Shaders/Blur.vert</file>
+        <file>Resources/Shaders/LastPassBlur.frag</file>
+        <file>Resources/Shaders/LastPassBlur.geom</file>
+        <file>Resources/Shaders/LastPassBlur.vert</file>
     </qresource>
 </RCC>
