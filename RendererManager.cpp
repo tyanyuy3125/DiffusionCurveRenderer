@@ -180,87 +180,18 @@ void RendererManager::renderContours(QOpenGLFramebufferObject *target, bool clea
 void RendererManager::renderDiffusion(QOpenGLFramebufferObject *target, bool clearTarget)
 {
     // First pass (render colors to initial framebuffer)
-    {
-        mCamera->resize(mInitialFramebuffer->width(), mInitialFramebuffer->height());
-
-        mInitialFramebuffer->bind();
-        glViewport(0, 0, mInitialFramebuffer->width(), mInitialFramebuffer->height());
-        glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        mShaderManager->bind(ShaderType::ColorShader);
-        mPoints->bind();
-
-        mShaderManager->setUniformValue("projection", mCamera->projection());
-        mShaderManager->setUniformValue("pointsDelta", mPoints->delta());
-        mShaderManager->setUniformValue("zoom", mCamera->zoom());
-
-        for (auto &curve : mCurves)
-        {
-            if (curve == nullptr)
-                continue;
-
-            auto controlPoints = curve->getControlPointPositions();
-            auto leftColors = curve->getLeftColors();
-            auto leftColorPositions = curve->getLeftColorPositions();
-            auto rightColors = curve->getRightColors();
-            auto rightColorPositions = curve->getRightColorPositions();
-            auto blurPointPositions = curve->getBlurPointPositions();
-            auto blurPointStrengths = curve->getBlurPointStrengths();
-
-            mShaderManager->setUniformValue("diffusionWidth", curve->mDiffusionWidth);
-            mShaderManager->setUniformValueArray("controlPoints", controlPoints);
-            mShaderManager->setUniformValue("controlPointsCount", (int) controlPoints.size());
-            mShaderManager->setUniformValueArray("leftColors", leftColors);
-            mShaderManager->setUniformValueArray("leftColorPositions", leftColorPositions);
-            mShaderManager->setUniformValue("leftColorsCount", (int) leftColorPositions.size());
-            mShaderManager->setUniformValueArray("rightColors", rightColors);
-            mShaderManager->setUniformValueArray("rightColorPositions", rightColorPositions);
-            mShaderManager->setUniformValue("rightColorsCount", (int) rightColorPositions.size());
-            mShaderManager->setUniformValueArray("blurPointPositions", blurPointPositions);
-            mShaderManager->setUniformValueArray("blurPointStrengths", blurPointStrengths);
-            mShaderManager->setUniformValue("blurPointsCount", (int) blurPointPositions.size());
-
-            glDrawArrays(GL_POINTS, 0, mPoints->size());
-        }
-
-        mPoints->release();
-        mShaderManager->release();
-
-        // Restore camera
-        mCamera->resize(mWidth, mHeight);
-    }
+    renderColors(mInitialFramebuffer);
 
     // Downsample 0
-    {
-        mDownsampleFramebuffers[0]->bind();
-        glViewport(0, 0, mDownsampleFramebuffers[0]->width(), mDownsampleFramebuffers[0]->height());
-        glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        mShaderManager->bind(ShaderType::DownsampleShader);
-        mShaderManager->setSampler("colorTexture", 0, mInitialFramebuffer->textures().at(0));
-        mShaderManager->setSampler("blurTexture", 1, mInitialFramebuffer->textures().at(1));
-        mQuad->render();
-        mShaderManager->release();
-        mDownsampleFramebuffers[0]->release();
-    }
+    downsample(mDownsampleFramebuffers[0], mInitialFramebuffer);
 
     // Downsample 1,2,3...
-
     for (int i = 1; i < mDownsampleFramebuffers.size(); ++i)
     {
-        mDownsampleFramebuffers[i]->bind();
-        glViewport(0, 0, mDownsampleFramebuffers[i]->width(), mDownsampleFramebuffers[i]->height());
-        glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT);
-        mShaderManager->bind(ShaderType::DownsampleShader);
-        mShaderManager->setSampler("colorTexture", 0, mDownsampleFramebuffers[i - 1]->textures().at(0));
-        mShaderManager->setSampler("blurTexture", 1, mDownsampleFramebuffers[i - 1]->textures().at(1));
-        mQuad->render();
-        mShaderManager->release();
+        downsample(mDownsampleFramebuffers[i], mDownsampleFramebuffers[i - 1]);
     }
 
+    // Blit mDownsampleFramebuffers.last() ----> mUpsampleFramebuffers.last()
     QOpenGLFramebufferObject::blitFramebuffer(mUpsampleFramebuffers.last(), //
                                               QRect(0, 0, mUpsampleFramebuffers.last()->width(), mUpsampleFramebuffers.last()->height()),
                                               mDownsampleFramebuffers.last(),
@@ -279,152 +210,17 @@ void RendererManager::renderDiffusion(QOpenGLFramebufferObject *target, bool cle
                                               1,
                                               1);
 
-    // Upsample and Smooth second last
-    {
-        int i = mUpsampleFramebuffers.size() - 2;
-        mUpsampleFramebuffers[i]->bind();
-        glViewport(0, 0, mUpsampleFramebuffers[i]->width(), mUpsampleFramebuffers[i]->height());
-        glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        mShaderManager->bind(ShaderType::UpsampleShader);
-        mShaderManager->setSampler("colorSourceTexture", 0, mUpsampleFramebuffers.last()->textures().at(0));
-        mShaderManager->setSampler("colorTargetTexture", 1, mDownsampleFramebuffers[i]->textures().at(0));
-        mShaderManager->setSampler("blurSourceTexture", 2, mUpsampleFramebuffers.last()->textures().at(1));
-        mShaderManager->setSampler("blurTargetTexture", 3, mDownsampleFramebuffers[i]->textures().at(1));
-        mQuad->render();
-        mShaderManager->release();
-
-        mShaderManager->bind(ShaderType::JacobiShader);
-        mShaderManager->setSampler("colorConstrainedTexture", 0, mDownsampleFramebuffers.last()->textures().at(0));
-        mShaderManager->setSampler("colorTargetTexture", 1, mUpsampleFramebuffers[i]->textures().at(0));
-        mShaderManager->setSampler("blurConstrainedTexture", 2, mDownsampleFramebuffers.last()->textures().at(1));
-        mShaderManager->setSampler("blurTargetTexture", 3, mUpsampleFramebuffers[i]->textures().at(1));
-        mQuad->render();
-        mShaderManager->release();
-
-        for (int j = 0; j < mSmoothIterations; j++)
-        {
-            QOpenGLFramebufferObject::blitFramebuffer(mUpsampleFramebuffers.last(), //
-                                                      QRect(0, 0, mUpsampleFramebuffers.last()->width(), mUpsampleFramebuffers.last()->height()),
-                                                      mDownsampleFramebuffers.last(),
-                                                      QRect(0, 0, mDownsampleFramebuffers.last()->width(), mDownsampleFramebuffers.last()->height()),
-                                                      GL_COLOR_BUFFER_BIT,
-                                                      GL_NEAREST,
-                                                      0,
-                                                      0);
-
-            QOpenGLFramebufferObject::blitFramebuffer(mUpsampleFramebuffers.last(), //
-                                                      QRect(0, 0, mUpsampleFramebuffers.last()->width(), mUpsampleFramebuffers.last()->height()),
-                                                      mDownsampleFramebuffers.last(),
-                                                      QRect(0, 0, mDownsampleFramebuffers.last()->width(), mDownsampleFramebuffers.last()->height()),
-                                                      GL_COLOR_BUFFER_BIT,
-                                                      GL_NEAREST,
-                                                      1,
-                                                      1);
-
-            mShaderManager->bind(ShaderType::JacobiShader);
-            mShaderManager->setSampler("colorConstrainedTexture", 0, mDownsampleFramebuffers.last()->textures().at(0));
-            mShaderManager->setSampler("colorTargetTexture", 1, mUpsampleFramebuffers[i]->textures().at(0));
-            mShaderManager->setSampler("blurConstrainedTexture", 2, mDownsampleFramebuffers.last()->textures().at(1));
-            mShaderManager->setSampler("blurTargetTexture", 3, mUpsampleFramebuffers[i]->textures().at(1));
-            mQuad->render();
-            mShaderManager->release();
-        }
-
-        mUpsampleFramebuffers[i]->release();
-    }
-
     // Upsample and Smooth
-    for (int i = mUpsampleFramebuffers.size() - 3; 0 <= i; --i)
+    for (int i = mUpsampleFramebuffers.size() - 2; 0 <= i; --i)
     {
-        mUpsampleFramebuffers[i]->bind();
-        glViewport(0, 0, mUpsampleFramebuffers[i]->width(), mUpsampleFramebuffers[i]->height());
-        glClearColor(0, 0, 0, 0);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        mShaderManager->bind(ShaderType::UpsampleShader);
-        mShaderManager->setSampler("colorSourceTexture", 0, mUpsampleFramebuffers[i + 1]->textures().at(0));
-        mShaderManager->setSampler("colorTargetTexture", 1, mDownsampleFramebuffers[i]->textures().at(0));
-        mShaderManager->setSampler("blurSourceTexture", 2, mUpsampleFramebuffers[i + 1]->textures().at(1));
-        mShaderManager->setSampler("blurTargetTexture", 3, mDownsampleFramebuffers[i]->textures().at(1));
-        mQuad->render();
-        mShaderManager->release();
-
-        for (int j = 0; j < mSmoothIterations; j++)
-        {
-            QOpenGLFramebufferObject::blitFramebuffer(mTemporaryFrameBuffers[i], //
-                                                      QRect(0, 0, mTemporaryFrameBuffers[i]->width(), mTemporaryFrameBuffers[i]->height()),
-                                                      mUpsampleFramebuffers[i],
-                                                      QRect(0, 0, mUpsampleFramebuffers[i]->width(), mUpsampleFramebuffers[i]->height()),
-                                                      GL_COLOR_BUFFER_BIT,
-                                                      GL_NEAREST,
-                                                      0,
-                                                      0);
-
-            QOpenGLFramebufferObject::blitFramebuffer(mTemporaryFrameBuffers[i], //
-                                                      QRect(0, 0, mTemporaryFrameBuffers[i]->width(), mTemporaryFrameBuffers[i]->height()),
-                                                      mUpsampleFramebuffers[i],
-                                                      QRect(0, 0, mUpsampleFramebuffers[i]->width(), mUpsampleFramebuffers[i]->height()),
-                                                      GL_COLOR_BUFFER_BIT,
-                                                      GL_NEAREST,
-                                                      1,
-                                                      1);
-
-            mShaderManager->bind(ShaderType::JacobiShader);
-            mShaderManager->setSampler("colorConstrainedTexture", 0, mDownsampleFramebuffers[i]->textures().at(0));
-            mShaderManager->setSampler("colorTargetTexture", 1, mTemporaryFrameBuffers[i]->textures().at(0));
-            mShaderManager->setSampler("blurConstrainedTexture", 2, mDownsampleFramebuffers[i]->textures().at(1));
-            mShaderManager->setSampler("blurTargetTexture", 3, mTemporaryFrameBuffers[i]->textures().at(1));
-            mQuad->render();
-            mShaderManager->release();
-        }
-
-        mUpsampleFramebuffers[i]->release();
+        upsample(mUpsampleFramebuffers[i], mTemporaryFrameBuffers[i], mUpsampleFramebuffers[i + 1], mDownsampleFramebuffers[i]);
     }
 
     //    mUpsampleFramebuffers[0]->toImage(true, 0).save("000.bmp");
     //    mUpsampleFramebuffers[0]->toImage(true, 1).save("001.bmp");
 
     // Last Pass Blur
-    {
-        mCamera->resize(mUpsampleFramebuffers[0]->width(), mUpsampleFramebuffers[0]->height());
-
-        mUpsampleFramebuffers[0]->bind();
-        glViewport(0, 0, mUpsampleFramebuffers[0]->width(), mUpsampleFramebuffers[0]->height());
-
-        mShaderManager->bind(ShaderType::LastPassBlurShader);
-        mPoints->bind();
-
-        mShaderManager->setUniformValue("projection", mCamera->projection());
-        mShaderManager->setUniformValue("pointsDelta", mPoints->delta());
-        mShaderManager->setUniformValue("zoom", mCamera->zoom());
-
-        for (auto &curve : mCurves)
-        {
-            if (curve == nullptr)
-                continue;
-
-            auto controlPoints = curve->getControlPointPositions();
-            auto blurPointPositions = curve->getBlurPointPositions();
-            auto blurPointStrengths = curve->getBlurPointStrengths();
-
-            mShaderManager->setUniformValue("diffusionWidth", curve->mDiffusionWidth);
-            mShaderManager->setUniformValueArray("controlPoints", controlPoints);
-            mShaderManager->setUniformValue("controlPointsCount", (int) controlPoints.size());
-            mShaderManager->setUniformValueArray("blurPointPositions", blurPointPositions);
-            mShaderManager->setUniformValueArray("blurPointStrengths", blurPointStrengths);
-            mShaderManager->setUniformValue("blurPointsCount", (int) blurPointPositions.size());
-
-            glDrawArrays(GL_POINTS, 0, mPoints->size());
-        }
-
-        mPoints->release();
-        mShaderManager->release();
-
-        // Restore camera
-        mCamera->resize(mWidth, mHeight);
-    }
+    drawFinalBlurCurves(mUpsampleFramebuffers[0]);
 
     //    mUpsampleFramebuffers[0]->toImage(true, 0).save("000.bmp");
     //    mUpsampleFramebuffers[0]->toImage(true, 1).save("001.bmp");
@@ -473,6 +269,162 @@ void RendererManager::renderDiffusion(QOpenGLFramebufferObject *target, bool cle
         mQuad->render();
         mShaderManager->release();
     }
+}
+
+void RendererManager::renderColors(QOpenGLFramebufferObject *draw)
+{
+    mCamera->resize(draw->width(), draw->height());
+
+    draw->bind();
+    glViewport(0, 0, draw->width(), draw->height());
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    mShaderManager->bind(ShaderType::ColorShader);
+    mPoints->bind();
+
+    mShaderManager->setUniformValue("projection", mCamera->projection());
+    mShaderManager->setUniformValue("pointsDelta", mPoints->delta());
+    mShaderManager->setUniformValue("zoom", mCamera->zoom());
+
+    for (auto &curve : mCurves)
+    {
+        if (curve == nullptr)
+            continue;
+
+        auto controlPoints = curve->getControlPointPositions();
+        auto leftColors = curve->getLeftColors();
+        auto leftColorPositions = curve->getLeftColorPositions();
+        auto rightColors = curve->getRightColors();
+        auto rightColorPositions = curve->getRightColorPositions();
+        auto blurPointPositions = curve->getBlurPointPositions();
+        auto blurPointStrengths = curve->getBlurPointStrengths();
+
+        mShaderManager->setUniformValue("diffusionWidth", curve->mDiffusionWidth);
+        mShaderManager->setUniformValueArray("controlPoints", controlPoints);
+        mShaderManager->setUniformValue("controlPointsCount", (int) controlPoints.size());
+        mShaderManager->setUniformValueArray("leftColors", leftColors);
+        mShaderManager->setUniformValueArray("leftColorPositions", leftColorPositions);
+        mShaderManager->setUniformValue("leftColorsCount", (int) leftColorPositions.size());
+        mShaderManager->setUniformValueArray("rightColors", rightColors);
+        mShaderManager->setUniformValueArray("rightColorPositions", rightColorPositions);
+        mShaderManager->setUniformValue("rightColorsCount", (int) rightColorPositions.size());
+        mShaderManager->setUniformValueArray("blurPointPositions", blurPointPositions);
+        mShaderManager->setUniformValueArray("blurPointStrengths", blurPointStrengths);
+        mShaderManager->setUniformValue("blurPointsCount", (int) blurPointPositions.size());
+
+        glDrawArrays(GL_POINTS, 0, mPoints->size());
+    }
+
+    mPoints->release();
+    mShaderManager->release();
+
+    // Restore camera
+    mCamera->resize(mWidth, mHeight);
+
+    draw->release();
+}
+
+void RendererManager::downsample(QOpenGLFramebufferObject *draw, QOpenGLFramebufferObject *read)
+{
+    draw->bind();
+    glViewport(0, 0, draw->width(), draw->height());
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    mShaderManager->bind(ShaderType::DownsampleShader);
+    mShaderManager->setSampler("colorTexture", 0, read->textures().at(0));
+    mShaderManager->setSampler("blurTexture", 1, read->textures().at(1));
+    mQuad->render();
+    mShaderManager->release();
+    draw->release();
+}
+
+void RendererManager::upsample(QOpenGLFramebufferObject *draw, QOpenGLFramebufferObject *drawBuffer, QOpenGLFramebufferObject *source, QOpenGLFramebufferObject *target)
+{
+    draw->bind();
+    glViewport(0, 0, draw->width(), draw->height());
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    mShaderManager->bind(ShaderType::UpsampleShader);
+    mShaderManager->setSampler("colorSourceTexture", 0, source->textures().at(0));
+    mShaderManager->setSampler("colorTargetTexture", 1, target->textures().at(0));
+    mShaderManager->setSampler("blurSourceTexture", 2, source->textures().at(1));
+    mShaderManager->setSampler("blurTargetTexture", 3, target->textures().at(1));
+    mQuad->render();
+    mShaderManager->release();
+
+    for (int j = 0; j < mSmoothIterations; j++)
+    {
+        QOpenGLFramebufferObject::blitFramebuffer(drawBuffer, //
+                                                  QRect(0, 0, drawBuffer->width(), drawBuffer->height()),
+                                                  draw,
+                                                  QRect(0, 0, draw->width(), draw->height()),
+                                                  GL_COLOR_BUFFER_BIT,
+                                                  GL_NEAREST,
+                                                  0,
+                                                  0);
+
+        QOpenGLFramebufferObject::blitFramebuffer(drawBuffer, //
+                                                  QRect(0, 0, drawBuffer->width(), drawBuffer->height()),
+                                                  draw,
+                                                  QRect(0, 0, draw->width(), draw->height()),
+                                                  GL_COLOR_BUFFER_BIT,
+                                                  GL_NEAREST,
+                                                  1,
+                                                  1);
+
+        mShaderManager->bind(ShaderType::JacobiShader);
+        mShaderManager->setSampler("colorConstrainedTexture", 0, target->textures().at(0));
+        mShaderManager->setSampler("colorTargetTexture", 1, drawBuffer->textures().at(0));
+        mShaderManager->setSampler("blurConstrainedTexture", 2, target->textures().at(1));
+        mShaderManager->setSampler("blurTargetTexture", 3, drawBuffer->textures().at(1));
+        mQuad->render();
+        mShaderManager->release();
+    }
+
+    draw->release();
+}
+
+void RendererManager::drawFinalBlurCurves(QOpenGLFramebufferObject *draw)
+{
+    mCamera->resize(draw->width(), draw->height());
+
+    draw->bind();
+    glViewport(0, 0, draw->width(), draw->height());
+
+    mShaderManager->bind(ShaderType::LastPassBlurShader);
+    mPoints->bind();
+
+    mShaderManager->setUniformValue("projection", mCamera->projection());
+    mShaderManager->setUniformValue("pointsDelta", mPoints->delta());
+    mShaderManager->setUniformValue("zoom", mCamera->zoom());
+
+    for (auto &curve : mCurves)
+    {
+        if (curve == nullptr)
+            continue;
+
+        auto controlPoints = curve->getControlPointPositions();
+        auto blurPointPositions = curve->getBlurPointPositions();
+        auto blurPointStrengths = curve->getBlurPointStrengths();
+
+        mShaderManager->setUniformValue("diffusionWidth", curve->mDiffusionWidth);
+        mShaderManager->setUniformValueArray("controlPoints", controlPoints);
+        mShaderManager->setUniformValue("controlPointsCount", (int) controlPoints.size());
+        mShaderManager->setUniformValueArray("blurPointPositions", blurPointPositions);
+        mShaderManager->setUniformValueArray("blurPointStrengths", blurPointStrengths);
+        mShaderManager->setUniformValue("blurPointsCount", (int) blurPointPositions.size());
+
+        glDrawArrays(GL_POINTS, 0, mPoints->size());
+    }
+
+    mPoints->release();
+    mShaderManager->release();
+    draw->release();
+
+    // Restore camera
+    mCamera->resize(mWidth, mHeight);
 }
 
 void RendererManager::createFramebuffers()

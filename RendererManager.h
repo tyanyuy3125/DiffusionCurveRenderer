@@ -37,8 +37,11 @@ private:
     void renderDiffusion(QOpenGLFramebufferObject *target, bool clearTarget = true);
     void createFramebuffers();
     void deleteFramebuffers();
-    void applyBlur(QOpenGLFramebufferObject *read, QOpenGLFramebufferObject *draw, int times);
-    void fillFramebuffer(QOpenGLFramebufferObject *draw, QOpenGLFramebufferObject *read);
+
+    void renderColors(QOpenGLFramebufferObject *draw);
+    void downsample(QOpenGLFramebufferObject *draw, QOpenGLFramebufferObject *read);
+    void upsample(QOpenGLFramebufferObject *draw, QOpenGLFramebufferObject *drawBuffer, QOpenGLFramebufferObject *source, QOpenGLFramebufferObject *target);
+    void drawFinalBlurCurves(QOpenGLFramebufferObject *draw);
 
 private:
     ShaderManager *mShaderManager;
