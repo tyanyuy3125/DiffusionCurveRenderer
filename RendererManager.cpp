@@ -201,29 +201,22 @@ void RendererManager::renderDiffusion(QOpenGLFramebufferObject *target, bool cle
                 continue;
 
             auto controlPoints = curve->getControlPointPositions();
-
             auto leftColors = curve->getLeftColors();
             auto leftColorPositions = curve->getLeftColorPositions();
-
             auto rightColors = curve->getRightColors();
             auto rightColorPositions = curve->getRightColorPositions();
-
             auto blurPointPositions = curve->getBlurPointPositions();
             auto blurPointStrengths = curve->getBlurPointStrengths();
 
             mShaderManager->setUniformValue("diffusionWidth", curve->mDiffusionWidth);
-
             mShaderManager->setUniformValueArray("controlPoints", controlPoints);
             mShaderManager->setUniformValue("controlPointsCount", (int) controlPoints.size());
-
             mShaderManager->setUniformValueArray("leftColors", leftColors);
             mShaderManager->setUniformValueArray("leftColorPositions", leftColorPositions);
             mShaderManager->setUniformValue("leftColorsCount", (int) leftColorPositions.size());
-
             mShaderManager->setUniformValueArray("rightColors", rightColors);
             mShaderManager->setUniformValueArray("rightColorPositions", rightColorPositions);
             mShaderManager->setUniformValue("rightColorsCount", (int) rightColorPositions.size());
-
             mShaderManager->setUniformValueArray("blurPointPositions", blurPointPositions);
             mShaderManager->setUniformValueArray("blurPointStrengths", blurPointStrengths);
             mShaderManager->setUniformValue("blurPointsCount", (int) blurPointPositions.size());
@@ -413,15 +406,12 @@ void RendererManager::renderDiffusion(QOpenGLFramebufferObject *target, bool cle
                 continue;
 
             auto controlPoints = curve->getControlPointPositions();
-
             auto blurPointPositions = curve->getBlurPointPositions();
             auto blurPointStrengths = curve->getBlurPointStrengths();
 
             mShaderManager->setUniformValue("diffusionWidth", curve->mDiffusionWidth);
-
             mShaderManager->setUniformValueArray("controlPoints", controlPoints);
             mShaderManager->setUniformValue("controlPointsCount", (int) controlPoints.size());
-
             mShaderManager->setUniformValueArray("blurPointPositions", blurPointPositions);
             mShaderManager->setUniformValueArray("blurPointStrengths", blurPointStrengths);
             mShaderManager->setUniformValue("blurPointsCount", (int) blurPointPositions.size());
