@@ -1,6 +1,7 @@
 #ifndef COLORPOINT_H
 #define COLORPOINT_H
 
+#include "Common.h"
 #include <QVector4D>
 
 class Bezier;
@@ -10,20 +11,22 @@ class ColorPoint
 public:
     ColorPoint();
 
-    QVector2D getPosition2D(float gap = 5.0f) const;
+    void setParent(Bezier *newParent);
+    QVector2D getPosition2D(float gap = COLOR_POINT_VISUAL_GAP) const;
 
     enum class Direction { //
         Left,
         Right
     };
 
-public:
+private:
     Bezier *mParent;
+
+public:
     QVector4D mColor;
     float mPosition;
     bool mSelected;
     Direction mDirection;
-    void setParent(Bezier *newParent);
 };
 
 #endif // COLORPOINT_H

@@ -98,6 +98,17 @@ QVector<Bezier *> Helper::loadCurveDataFromXML(const QString &filename)
                 child = child.nextSibling().toElement();
             }
         }
+
+        BlurPoint *blurPoint0 = new BlurPoint;
+        blurPoint0->setParent(curve);
+        blurPoint0->mPosition = 0.0f;
+        curve->addBlurPoint(blurPoint0);
+
+        BlurPoint *blurPoint1 = new BlurPoint;
+        blurPoint1->setParent(curve);
+        blurPoint1->mPosition = 1.0f;
+        curve->addBlurPoint(blurPoint1);
+
         curves << curve;
         component = component.nextSibling().toElement();
     }
@@ -133,6 +144,7 @@ QVector<Bezier *> Helper::loadCurveDataFromJSON(const QString &filename)
         QJsonArray leftColorsArray = curveObject["left_color_points"].toArray();
         QJsonArray rightColorsArray = curveObject["right_color_points"].toArray();
         QJsonArray controlPointsArray = curveObject["control_points"].toArray();
+        QJsonArray blurPointsArray = curveObject["blur_points"].toArray();
         int z = curveObject["z"].toInt();
 
         // Control points
@@ -146,6 +158,20 @@ QVector<Bezier *> Helper::loadCurveDataFromJSON(const QString &filename)
             ControlPoint *controlPoint = new ControlPoint;
             controlPoint->mPosition = QVector2D(x, y);
             curve->addControlPoint(controlPoint);
+        }
+
+        // Blur points
+        for (auto blurPointElement : blurPointsArray)
+        {
+            QJsonObject blurPointObject = blurPointElement.toObject();
+            float position = blurPointObject["position"].toDouble();
+            float strength = blurPointObject["strength"].toDouble();
+
+            BlurPoint *point = new BlurPoint;
+            point->mPosition = position;
+            point->mStrength = strength;
+            point->setParent(curve);
+            curve->addBlurPoint(point);
         }
 
         // Left colors
@@ -203,8 +229,9 @@ bool Helper::saveCurveDataToJSON(const QVector<Bezier *> &curves, const QString 
         QJsonArray controlPointsArray;
         QJsonArray leftColorsArray;
         QJsonArray rightColorsArray;
+        QJsonArray blurPointsArray;
 
-        // Control point
+        // Control points
         QVector<ControlPoint *> controlPoints = curve->controlPoints();
 
         for (const auto controlPoint : controlPoints)
@@ -220,8 +247,21 @@ bool Helper::saveCurveDataToJSON(const QVector<Bezier *> &curves, const QString 
             controlPointsArray << controlPointObject;
         }
 
+        // Blur points
+        QVector<BlurPoint *> blurPoints = curve->blurPoints();
+
+        for (const auto blurPoint : blurPoints)
+        {
+            QJsonObject blurPointObject;
+
+            blurPointObject.insert("position", blurPoint->mPosition);
+            blurPointObject.insert("strength", blurPoint->mStrength);
+
+            blurPointsArray << blurPointObject;
+        }
+
         // Left colors
-        QVector<ColorPoint *> leftColors = curve->getLeftColorPoints();
+        QList<ColorPoint *> leftColors = curve->leftColorPoints();
 
         for (const auto leftColor : leftColors)
         {
@@ -240,7 +280,7 @@ bool Helper::saveCurveDataToJSON(const QVector<Bezier *> &curves, const QString 
         }
 
         // Right colors
-        QVector<ColorPoint *> rightColors = curve->getRightColorPoints();
+        QList<ColorPoint *> rightColors = curve->rightColorPoints();
 
         for (const auto rightColor : rightColors)
         {
@@ -262,6 +302,7 @@ bool Helper::saveCurveDataToJSON(const QVector<Bezier *> &curves, const QString 
         curveObject.insert("control_points", controlPointsArray);
         curveObject.insert("left_color_points", leftColorsArray);
         curveObject.insert("right_color_points", rightColorsArray);
+        curveObject.insert("blur_points", blurPointsArray);
         curvesArray << curveObject;
     }
 

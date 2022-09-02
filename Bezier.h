@@ -1,6 +1,7 @@
 #ifndef BEZIER_H
 #define BEZIER_H
 
+#include "BlurPoint.h"
 #include "ColorPoint.h"
 #include "ControlPoint.h"
 #include "Curve.h"
@@ -14,40 +15,39 @@ public:
     Bezier();
     virtual ~Bezier();
 
-    ControlPoint *getControlPoint(int index) const;
-    QVector<QVector2D> getControlPointPositions() const;
-
     void addControlPoint(ControlPoint *controlPoint);
     void addColorPoint(ColorPoint *colorPoint);
+    void addBlurPoint(BlurPoint *blurPoint);
 
     void removeControlPoint(int index);
     void removeControlPoint(ControlPoint *controlPoint);
-
-    QVector<ColorPoint *> getLeftColorPoints() const;
-    QVector<ColorPoint *> getRightColorPoints() const;
-    QVector<ColorPoint *> getAllColorPoints() const;
-
-    ColorPoint *getLeftColorPoint(int index) const;
-    ColorPoint *getRightColorPoint(int index) const;
-
     void removeLeftColorPoint(int index);
     void removeRightColorPoint(int index);
     void removeColorPoint(ColorPoint *controlPoint);
+    void removeBlurPoint(BlurPoint *blurPoint);
+    void removeBlurPoint(int index);
+
+    QVector<ColorPoint *> getAllColorPoints() const;
 
     QVector4D leftColorAt(float t) const;
     QVector4D rightColorAt(float t) const;
 
     void orderLeftColorPoints();
     void orderRightColorPoints();
+    void orderBlurPoints();
 
     QVector<QVector4D> getLeftColors() const;
     QVector<QVector4D> getRightColors() const;
+    QVector<float> getBlurPointStrengths() const;
 
+    QVector<QVector2D> getControlPointPositions() const;
     QVector<float> getLeftColorPositions() const;
     QVector<float> getRightColorPositions() const;
+    QVector<float> getBlurPointPositions();
 
-    ColorPoint *getClosestColorPoint(const QVector2D &nearbyPoint) const;
     ControlPoint *getClosestControlPoint(const QVector2D &nearbyPoint) const;
+    ColorPoint *getClosestColorPoint(const QVector2D &nearbyPoint) const;
+    BlurPoint *getClosestBlurPoint(const QVector2D &nearbyPoint) const;
 
     int order() const;
     int degree() const;
@@ -58,6 +58,9 @@ public:
     QVector2D normalAt(float t) const override;
 
     const QList<ControlPoint *> &controlPoints() const;
+    const QList<ColorPoint *> &leftColorPoints() const;
+    const QList<ColorPoint *> &rightColorPoints() const;
+    const QList<BlurPoint *> &blurPoints() const;
 
 private:
     QVector<float> getCoefficients() const;
@@ -76,6 +79,7 @@ private:
     QList<ControlPoint *> mControlPoints;
     QList<ColorPoint *> mLeftColorPoints;
     QList<ColorPoint *> mRightColorPoints;
+    QList<BlurPoint *> mBlurPoints;
 };
 
 #endif // BEZIER_H

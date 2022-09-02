@@ -6,10 +6,12 @@ CurveManager::CurveManager(QObject *parent)
     , mSelectedCurve(nullptr)
     , mSelectedControlPoint(nullptr)
     , mSelectedColorPoint(nullptr)
+    , mSelectedBlurPoint(nullptr)
 {}
 
 bool CurveManager::init()
 {
+    mCamera = Camera::instance(); // For fetching zoom, used for color and blur point selection
     return true;
 }
 
@@ -67,6 +69,19 @@ void CurveManager::setGlobalDiffusionWidth(float width)
         curve->mDiffusionWidth = width;
 }
 
+void CurveManager::setGlobalBlurStrength(float strength)
+{
+    for (auto &curve : mCurves)
+    {
+        auto blurPoints = curve->blurPoints();
+
+        for (auto &blurPoint : blurPoints)
+        {
+            blurPoint->mStrength = strength;
+        }
+    }
+}
+
 void CurveManager::deselectAllCurves()
 {
     for (int i = 0; i < mCurves.size(); ++i)
@@ -81,29 +96,62 @@ void CurveManager::select(const QVector2D &position, float radius)
     {
         ControlPoint *controlPoint = getClosestControlPointOnSelectedCurve(position, radius);
         ColorPoint *colorPoint = getClosestColorPointOnSelectedCurve(position, radius);
+        BlurPoint *blurPoint = getClosestBlurPointOnSelectedCurve(position, radius);
 
-        if (controlPoint && colorPoint)
+        if (controlPoint && colorPoint && blurPoint)
         {
             float distanceToControlPoint = position.distanceToPoint(controlPoint->mPosition);
-            float distanceToColorPoint = position.distanceToPoint(colorPoint->getPosition2D());
+            float distanceToColorPoint = position.distanceToPoint(colorPoint->getPosition2D(mCamera->zoom() * COLOR_POINT_VISUAL_GAP));
+            float distanceToBlurPoint = position.distanceToPoint(blurPoint->getPosition2D(mCamera->zoom() * BLUR_POINT_VISUAL_GAP));
 
-            setSelectedControlPoint(distanceToColorPoint > distanceToControlPoint ? controlPoint : nullptr);
-            setSelectedColorPoint(distanceToColorPoint < distanceToControlPoint ? colorPoint : nullptr);
+            float min = qMin(distanceToControlPoint, qMin(distanceToColorPoint, distanceToBlurPoint));
+
+            if (qFuzzyCompare(min, distanceToControlPoint))
+            {
+                setSelectedControlPoint(controlPoint);
+                setSelectedColorPoint(nullptr);
+                setSelectedBlurPoint(nullptr);
+            }
+
+            else if (qFuzzyCompare(min, distanceToColorPoint))
+            {
+                setSelectedColorPoint(colorPoint);
+                setSelectedControlPoint(nullptr);
+                setSelectedBlurPoint(nullptr);
+            }
+
+            else if (qFuzzyCompare(min, distanceToBlurPoint))
+            {
+                setSelectedBlurPoint(blurPoint);
+                setSelectedControlPoint(nullptr);
+                setSelectedColorPoint(nullptr);
+            }
+
             return;
         } else if (controlPoint)
         {
             setSelectedControlPoint(controlPoint);
             setSelectedColorPoint(nullptr);
+            setSelectedBlurPoint(nullptr);
             return;
         } else if (colorPoint)
         {
-            setSelectedControlPoint(nullptr);
             setSelectedColorPoint(colorPoint);
+            setSelectedControlPoint(nullptr);
+            setSelectedBlurPoint(nullptr);
+            return;
+        } else if (blurPoint)
+        {
+            setSelectedBlurPoint(blurPoint);
+            setSelectedControlPoint(nullptr);
+            setSelectedColorPoint(nullptr);
+
             return;
         } else
         {
             setSelectedControlPoint(nullptr);
             setSelectedColorPoint(nullptr);
+            setSelectedBlurPoint(nullptr);
         }
     }
 
@@ -161,7 +209,7 @@ void CurveManager::addColorPoint(const QVector2D &position, bool select)
         ColorPoint::Direction type = cross.z() > 0 ? ColorPoint::Direction::Left : ColorPoint::Direction::Right;
 
         ColorPoint *colorPoint = new ColorPoint;
-        colorPoint->mParent = mSelectedCurve;
+        colorPoint->setParent(mSelectedCurve);
         colorPoint->mPosition = parameter;
         colorPoint->mDirection = type;
         colorPoint->mColor = QVector4D(1, 1, 1, 1);
@@ -171,6 +219,26 @@ void CurveManager::addColorPoint(const QVector2D &position, bool select)
         {
             setSelectedControlPoint(nullptr);
             setSelectedColorPoint(colorPoint);
+        }
+    }
+}
+
+void CurveManager::addBlurPoint(const QVector2D &position, bool select)
+{
+    if (mSelectedCurve && mSelectedCurve->size() >= 2)
+    {
+        float parameter = mSelectedCurve->parameterAt(position);
+
+        BlurPoint *blurPoint = new BlurPoint;
+        blurPoint->setParent(mSelectedCurve);
+        blurPoint->mPosition = parameter;
+        mSelectedCurve->addBlurPoint(blurPoint);
+
+        if (select)
+        {
+            setSelectedControlPoint(nullptr);
+            setSelectedColorPoint(nullptr);
+            setSelectedBlurPoint(blurPoint);
         }
     }
 }
@@ -207,6 +275,15 @@ void CurveManager::removeSelectedColorPoint()
     {
         mSelectedCurve->removeColorPoint(mSelectedColorPoint);
         setSelectedColorPoint(nullptr);
+    }
+}
+
+void CurveManager::removeSelectedBlurPoint()
+{
+    if (mSelectedCurve && mSelectedBlurPoint)
+    {
+        mSelectedCurve->removeBlurPoint(mSelectedBlurPoint);
+        setSelectedBlurPoint(nullptr);
     }
 }
 
@@ -259,16 +336,54 @@ ColorPoint *CurveManager::getClosestColorPointOnSelectedCurve(const QVector2D &n
     ColorPoint *colorPoint = mSelectedCurve->getClosestColorPoint(nearbyPoint);
 
     if (colorPoint)
-        if (colorPoint->getPosition2D().distanceToPoint(nearbyPoint) > radius)
+        if (colorPoint->getPosition2D(mCamera->zoom() * COLOR_POINT_VISUAL_GAP).distanceToPoint(nearbyPoint) > radius)
             colorPoint = nullptr;
 
     return colorPoint;
+}
+
+BlurPoint *CurveManager::getClosestBlurPointOnSelectedCurve(const QVector2D &nearbyPoint, float radius) const
+{
+    if (!mSelectedCurve)
+        return nullptr;
+
+    auto blurPoints = mSelectedCurve->blurPoints();
+
+    if (blurPoints.size() == 0)
+        return nullptr;
+
+    BlurPoint *blurPoint = mSelectedCurve->getClosestBlurPoint(nearbyPoint);
+
+    if (blurPoint)
+        if (blurPoint->getPosition2D(mCamera->zoom() * BLUR_POINT_VISUAL_GAP).distanceToPoint(nearbyPoint) > radius)
+            blurPoint = nullptr;
+
+    return blurPoint;
 }
 
 CurveManager *CurveManager::instance()
 {
     static CurveManager instance;
     return &instance;
+}
+
+BlurPoint *CurveManager::selectedBlurPoint() const
+{
+    return mSelectedBlurPoint;
+}
+
+void CurveManager::setSelectedBlurPoint(BlurPoint *newSelectedBlurPoint)
+{
+    if (mSelectedBlurPoint == newSelectedBlurPoint)
+        return;
+
+    if (mSelectedBlurPoint)
+        mSelectedBlurPoint->mSelected = false;
+
+    if (newSelectedBlurPoint)
+        newSelectedBlurPoint->mSelected = true;
+
+    mSelectedBlurPoint = newSelectedBlurPoint;
 }
 
 ColorPoint *CurveManager::selectedColorPoint() const

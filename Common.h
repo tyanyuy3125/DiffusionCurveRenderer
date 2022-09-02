@@ -8,6 +8,10 @@
 #define DEFAULT_CONTOUR_THICKNESS 3.0f
 #define DEFAULT_DIFFUSION_WIDTH 3.0f
 #define DEFAULT_CONTOUR_COLOR QVector4D(0, 0, 0, 1)
+#define DEFAULT_BLUR_STRENGTH 0.1f
+
+#define BLUR_POINT_VISUAL_GAP 25.0f
+#define COLOR_POINT_VISUAL_GAP 5.0f
 
 enum class ShaderType { //
     ContourShader,
@@ -23,6 +27,7 @@ enum class Mode { //
     Select,
     AddControlPoint,
     AddColorPoint,
+    AddBlurPoint,
 };
 
 enum class RenderMode { //
@@ -35,11 +40,14 @@ enum class Action { //
     Select,
     AddControlPoint,
     AddColorPoint,
+    AddBlurPoint,
     RemoveCurve,
     RemoveControlPoint,
     RemoveColorPoint,
+    RemoveBlurPoint,
     UpdateControlPointPosition,
     UpdateColorPointPosition,
+    UpdateBlurPointPosition,
     LoadFromXML,
     LoadFromJSON,
     SaveAsPNG,

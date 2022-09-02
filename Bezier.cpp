@@ -14,14 +14,18 @@ Bezier::~Bezier()
     for (int i = 0; i < mControlPoints.size(); ++i)
         if (mControlPoints[i])
             delete mControlPoints[i];
-}
 
-ControlPoint *Bezier::getControlPoint(int index) const
-{
-    if (0 <= index && index < mControlPoints.size())
-        return mControlPoints[index];
-    else
-        return nullptr;
+    for (int i = 0; i < mLeftColorPoints.size(); ++i)
+        if (mLeftColorPoints[i])
+            delete mLeftColorPoints[i];
+
+    for (int i = 0; i < mRightColorPoints.size(); ++i)
+        if (mRightColorPoints[i])
+            delete mRightColorPoints[i];
+
+    for (int i = 0; i < mBlurPoints.size(); ++i)
+        if (mBlurPoints[i])
+            delete mBlurPoints[i];
 }
 
 QVector<QVector2D> Bezier::getControlPointPositions() const
@@ -70,7 +74,7 @@ void Bezier::addColorPoint(ColorPoint *colorPoint)
         if (colorPoint)
         {
             mLeftColorPoints << colorPoint;
-            colorPoint->mParent = this;
+            colorPoint->setParent(this);
             orderLeftColorPoints();
         }
 
@@ -80,7 +84,7 @@ void Bezier::addColorPoint(ColorPoint *colorPoint)
         if (colorPoint)
         {
             mRightColorPoints << colorPoint;
-            colorPoint->mParent = this;
+            colorPoint->setParent(this);
             orderRightColorPoints();
         }
         break;
@@ -88,26 +92,10 @@ void Bezier::addColorPoint(ColorPoint *colorPoint)
     }
 }
 
-QVector<ColorPoint *> Bezier::getLeftColorPoints() const
+void Bezier::addBlurPoint(BlurPoint *blurPoint)
 {
-    QVector<ColorPoint *> points;
-
-    for (auto &point : mLeftColorPoints)
-        points << point;
-
-    return points;
-}
-
-QVector<ColorPoint *> Bezier::getRightColorPoints() const
-{
-    QVector<ColorPoint *> points;
-
-    for (auto &point : mRightColorPoints)
-    {
-        points << point;
-    }
-
-    return points;
+    mBlurPoints << blurPoint;
+    blurPoint->setParent(this);
 }
 
 QVector<ColorPoint *> Bezier::getAllColorPoints() const
@@ -117,16 +105,6 @@ QVector<ColorPoint *> Bezier::getAllColorPoints() const
     all << mRightColorPoints;
 
     return all;
-}
-
-ColorPoint *Bezier::getLeftColorPoint(int index) const
-{
-    return mLeftColorPoints[index];
-}
-
-ColorPoint *Bezier::getRightColorPoint(int index) const
-{
-    return mRightColorPoints[index];
 }
 
 void Bezier::removeLeftColorPoint(int index)
@@ -172,6 +150,25 @@ void Bezier::removeColorPoint(ColorPoint *point)
     }
 }
 
+void Bezier::removeBlurPoint(BlurPoint *blurPoint)
+{
+    for (int i = 0; i < mBlurPoints.size(); ++i)
+    {
+        if (blurPoint == mBlurPoints[i])
+        {
+            removeBlurPoint(i);
+            return;
+        }
+    }
+}
+
+void Bezier::removeBlurPoint(int index)
+{
+    delete mBlurPoints[index];
+    mBlurPoints.removeAt(index);
+    orderBlurPoints();
+}
+
 QVector4D Bezier::leftColorAt(float t) const
 {
     if (mLeftColorPoints.size() == 0 || mLeftColorPoints.size() == 1)
@@ -211,7 +208,7 @@ void Bezier::orderLeftColorPoints()
     if (mLeftColorPoints.size() == 0 || mLeftColorPoints.size() == 1)
         return;
 
-    QVector<ColorPoint *> orderedColorPoints;
+    QList<ColorPoint *> orderedColorPoints;
 
     orderedColorPoints << mLeftColorPoints[0];
 
@@ -238,7 +235,7 @@ void Bezier::orderRightColorPoints()
     if (mRightColorPoints.size() == 0 || mRightColorPoints.size() == 1)
         return;
 
-    QVector<ColorPoint *> orderedColorPoints;
+    QList<ColorPoint *> orderedColorPoints;
 
     orderedColorPoints << mRightColorPoints[0];
 
@@ -260,6 +257,33 @@ void Bezier::orderRightColorPoints()
     mRightColorPoints = orderedColorPoints;
 }
 
+void Bezier::orderBlurPoints()
+{
+    if (mBlurPoints.size() == 0 || mBlurPoints.size() == 1)
+        return;
+
+    QList<BlurPoint *> orderedPoints;
+
+    orderedPoints << mBlurPoints[0];
+
+    for (int i = 1; i < mBlurPoints.size(); ++i)
+    {
+        BlurPoint *currentPoint = mBlurPoints[i];
+
+        if (orderedPoints.last()->mPosition <= currentPoint->mPosition)
+            orderedPoints << currentPoint;
+        else
+            for (int j = 0; j < orderedPoints.size(); j++)
+                if (currentPoint->mPosition < orderedPoints[j]->mPosition)
+                {
+                    orderedPoints.insert(j, currentPoint);
+                    break;
+                }
+    }
+
+    mBlurPoints = orderedPoints;
+}
+
 QVector<QVector4D> Bezier::getLeftColors() const
 {
     QVector<QVector4D> leftColors;
@@ -276,6 +300,15 @@ QVector<QVector4D> Bezier::getRightColors() const
         rightColors << mRightColorPoints[i]->mColor;
 
     return rightColors;
+}
+
+QVector<float> Bezier::getBlurPointStrengths() const
+{
+    QVector<float> blurStrengths;
+    for (int i = 0; i < mBlurPoints.size(); i++)
+        blurStrengths << mBlurPoints[i]->mStrength;
+
+    return blurStrengths;
 }
 
 QVector<float> Bezier::getLeftColorPositions() const
@@ -296,6 +329,16 @@ QVector<float> Bezier::getRightColorPositions() const
         colorPointPositions << mRightColorPoints[i]->mPosition;
 
     return colorPointPositions;
+}
+
+QVector<float> Bezier::getBlurPointPositions()
+{
+    QVector<float> positions;
+
+    for (int i = 0; i < mBlurPoints.size(); i++)
+        positions << mBlurPoints[i]->mPosition;
+
+    return positions;
 }
 
 ColorPoint *Bezier::getClosestColorPoint(const QVector2D &point) const
@@ -321,6 +364,28 @@ ColorPoint *Bezier::getClosestColorPoint(const QVector2D &point) const
     }
 
     return allColorPoints[index];
+}
+
+BlurPoint *Bezier::getClosestBlurPoint(const QVector2D &nearbyPoint) const
+{
+    if (mBlurPoints.size() == 0)
+        return nullptr;
+
+    float minimumDistance = std::numeric_limits<float>::infinity();
+    int index = 0;
+
+    for (int i = 0; i < mBlurPoints.size(); ++i)
+    {
+        float distance = mBlurPoints[i]->getPosition2D().distanceToPoint(nearbyPoint);
+
+        if (distance < minimumDistance)
+        {
+            minimumDistance = distance;
+            index = i;
+        }
+    }
+
+    return mBlurPoints[index];
 }
 
 ControlPoint *Bezier::getClosestControlPoint(const QVector2D &nearbyPoint) const
@@ -414,6 +479,21 @@ float Bezier::factorial(int n) const
 float Bezier::choose(int n, int k) const
 {
     return factorial(n) / (factorial(k) * factorial(n - k));
+}
+
+const QList<ColorPoint *> &Bezier::leftColorPoints() const
+{
+    return mLeftColorPoints;
+}
+
+const QList<ColorPoint *> &Bezier::rightColorPoints() const
+{
+    return mRightColorPoints;
+}
+
+const QList<BlurPoint *> &Bezier::blurPoints() const
+{
+    return mBlurPoints;
 }
 
 const QList<ControlPoint *> &Bezier::controlPoints() const

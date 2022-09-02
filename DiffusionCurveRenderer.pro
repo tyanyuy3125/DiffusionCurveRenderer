@@ -12,6 +12,7 @@ include(Dependencies/qtimgui/qtimgui.pri)
 
 SOURCES += \
     Bezier.cpp \
+    BlurPoint.cpp \
     Camera.cpp \
     ColorPoint.cpp \
     ControlPoint.cpp \
@@ -32,6 +33,7 @@ SOURCES += \
 
 HEADERS += \
     Bezier.h \
+    BlurPoint.h \
     Camera.h \
     ColorPoint.h \
     Common.h \

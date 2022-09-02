@@ -63,10 +63,12 @@ private:
     float mGlobalContourThickness;
     float mGlobalDiffusionWidth;
     QVector4D mGlobalContourColor;
+    float mGlobalBlurStrength;
 
     // GUI
     QPen mDashedPen;
     QPen mSolidPen;
+    QPen mDenseDashedPen;
     QPointF mPreviousMousePosition;
     Qt::MouseButton mPressedButton;
     QFileDialog *mFileDialog;
@@ -76,8 +78,11 @@ private:
     Bezier *mSelectedCurve;
     ControlPoint *mSelectedControlPoint;
     ColorPoint *mSelectedColorPoint;
+    BlurPoint *mSelectedBlurPoint;
+
     QList<ControlPoint *> mControlPoints;
-    QVector<ColorPoint *> mColorPoints;
+    QList<ColorPoint *> mColorPoints;
+    QList<BlurPoint *> mBlurPoints;
 
     int mSmoothIterations;
 };
