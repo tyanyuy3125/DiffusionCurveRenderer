@@ -1,38 +1,32 @@
-#ifndef CAMERA_H
-#define CAMERA_H
+#ifndef VIEWMODECAMERA_H
+#define VIEWMODECAMERA_H
 
-#include <QKeyEvent>
 #include <QMatrix4x4>
+#include <QMouseEvent>
 #include <QObject>
 
-class Camera : public QObject
+class ViewModeCamera : public QObject
 {
     Q_OBJECT
 
-private:
-    explicit Camera(QObject *parent = nullptr);
+    explicit ViewModeCamera(QObject *parent = nullptr);
 
 public:
+    static ViewModeCamera *instance();
+
     void onMousePressed(QMouseEvent *event);
     void onMouseReleased(QMouseEvent *event);
     void onMouseMoved(QMouseEvent *event);
     void onWheelMoved(QWheelEvent *event);
     void resize(int width, int height);
     void update(float ifps);
-    void drawGUI();
 
     QMatrix4x4 projection() const;
 
-    static Camera *instance();
+    void setPixelRatio(float newPixelRatio);
 
     float zoom() const;
-
-    QVector2D toOpenGL(const QPointF &position) const;
-    QPointF toGUI(const QPointF &position) const;
-    QPointF toGUI(const QVector2D &position) const;
-    QRectF toGUI(const QRectF &rect) const;
-
-    void setPixelRatio(float newPixelRatio);
+    void setZoom(float newZoom);
 
     float left() const;
     void setLeft(float newLeft);
@@ -59,8 +53,6 @@ private:
         float dx = 0;
         float dy = 0;
     } mMouse;
-
-    QMatrix4x4 mTransform;
 };
 
-#endif // CAMERA_H
+#endif // VIEWMODECAMERA_H

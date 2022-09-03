@@ -2,7 +2,7 @@
 #define CURVEMANAGER_H
 
 #include "Bezier.h"
-#include "Camera.h"
+#include "EditModeCamera.h"
 #include "Manager.h"
 
 class CurveManager : public Manager
@@ -62,7 +62,7 @@ public:
     static CurveManager *instance();
 
 private:
-    Camera *mCamera;
+    EditModeCamera *mCamera;
 
     QList<Bezier *> mCurves;
     Bezier *mSelectedCurve;

@@ -160,6 +160,24 @@ bool ShaderManager::init()
             return false;
     }
 
+    // Bitmap Shader
+    {
+        Shader *shader = new Shader(ShaderType::BitmapShader);
+        mShaders.insert(shader->type(), shader);
+        shader->addPath(QOpenGLShader::Vertex, ":/Resources/Shaders/Bitmap.vert");
+        shader->addPath(QOpenGLShader::Fragment, ":/Resources/Shaders/Bitmap.frag");
+        shader->addUniform("projection");
+        shader->addUniform("transformation");
+        shader->addUniform("sourceTexture");
+        shader->addUniform("widthRatio");
+        shader->addUniform("heightRatio");
+        shader->addAttribute("position");
+        shader->addAttribute("textureCoords");
+
+        if (!shader->init())
+            return false;
+    }
+
     return true;
 }
 

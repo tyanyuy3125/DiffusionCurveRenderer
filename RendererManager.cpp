@@ -23,7 +23,7 @@ bool RendererManager::init()
 
     mShaderManager = ShaderManager::instance();
     mCurveManager = CurveManager::instance();
-    mCamera = Camera::instance();
+    mCamera = EditModeCamera::instance();
 
     mPoints = new Points;
     mQuad = new Quad;
@@ -222,8 +222,6 @@ void RendererManager::renderDiffusion(QOpenGLFramebufferObject *target, bool cle
     {
         upsample(mUpsampleFramebuffers[i], mTemporaryFrameBuffers[i], mUpsampleFramebuffers[i + 1], mDownsampleFramebuffers[i]);
     }
-
-    mUpsampleFramebuffers[0]->toImage().save("000.bmp");
 
     // Last Pass Blur
     drawFinalBlurCurves(mUpsampleFramebuffers[0]);

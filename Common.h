@@ -21,10 +21,20 @@ enum class ShaderType { //
     UpsampleShader,
     JacobiShader,
     BlurShader,
-    LastPassBlurShader
+    LastPassBlurShader,
+    BitmapShader
 };
 
-enum class Mode { //
+enum class WorkMode { //
+    View,
+    Edit,
+};
+
+enum class SubWorkMode { //
+    ViewOriginalImage
+};
+
+enum class ActionMode { //
     Select,
     AddControlPoint,
     AddColorPoint,
@@ -53,10 +63,12 @@ enum class Action { //
     LoadFromJSON,
     SaveAsPNG,
     SaveAsJSON,
+    VectorizeLoadedImage,
     ShowLoadFromXMLDialog,
     ShowLoadFromJSONDialog,
     ShowSaveAsPNGDialog,
     ShowSaveAsJSONDialog,
+    ShowLoadImageDialog,
     ClearCanvas
 
 };

@@ -11,7 +11,7 @@ CurveManager::CurveManager(QObject *parent)
 
 bool CurveManager::init()
 {
-    mCamera = Camera::instance(); // For fetching zoom, used for color and blur point selection
+    mCamera = EditModeCamera::instance(); // For fetching zoom, used for color point and blur point selection
     return true;
 }
 

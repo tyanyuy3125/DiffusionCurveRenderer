@@ -12,14 +12,15 @@ include(Dependencies/qtimgui/qtimgui.pri)
 
 SOURCES += \
     Bezier.cpp \
+    BitmapRenderer.cpp \
     BlurPoint.cpp \
-    Camera.cpp \
     ColorPoint.cpp \
     ControlPoint.cpp \
     Controller.cpp \
     Curve.cpp \
     CurveManager.cpp \
     CustomVariant.cpp \
+    EditModeCamera.cpp \
     Framebuffer.cpp \
     GaussianStack.cpp \
     Helper.cpp \
@@ -30,12 +31,14 @@ SOURCES += \
     RendererManager.cpp \
     Shader.cpp \
     ShaderManager.cpp \
+    Vectorizer.cpp \
+    ViewModeCamera.cpp \
     Window.cpp
 
 HEADERS += \
     Bezier.h \
+    BitmapRenderer.h \
     BlurPoint.h \
-    Camera.h \
     ColorPoint.h \
     Common.h \
     ControlPoint.h \
@@ -43,6 +46,7 @@ HEADERS += \
     Curve.h \
     CurveManager.h \
     CustomVariant.h \
+    EditModeCamera.h \
     Framebuffer.h \
     GaussianStack.h \
     Helper.h \
@@ -52,6 +56,8 @@ HEADERS += \
     RendererManager.h \
     Shader.h \
     ShaderManager.h \
+    Vectorizer.h \
+    ViewModeCamera.h \
     Window.h
 
 # Default rules for deployment.
@@ -68,5 +74,6 @@ DEPENDPATH += $$PWD/Dependencies/opencv-4.6.0/include
 
 LIBS += \
 -L$$PWD/Dependencies/opencv-4.6.0/x64/vc16/lib/ -lopencv_core460 \
--L$$PWD/Dependencies/opencv-4.6.0/x64/vc16/lib/ -lopencv_imgproc460
-
+-L$$PWD/Dependencies/opencv-4.6.0/x64/vc16/lib/ -lopencv_imgproc460 \
+-L$$PWD/Dependencies/opencv-4.6.0/x64/vc16/lib/ -lopencv_highgui460 \
+-L$$PWD/Dependencies/opencv-4.6.0/x64/vc16/lib/ -lopencv_imgcodecs460

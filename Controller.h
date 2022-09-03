@@ -1,12 +1,15 @@
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 
-#include "Camera.h"
+#include "BitmapRenderer.h"
 #include "Common.h"
 #include "CurveManager.h"
 #include "CustomVariant.h"
+#include "EditModeCamera.h"
 #include "RendererManager.h"
 #include "ShaderManager.h"
+#include "Vectorizer.h"
+#include "ViewModeCamera.h"
 
 #include <QObject>
 
@@ -44,17 +47,23 @@ private:
     RendererManager *mRendererManager;
     CurveManager *mCurveManager;
     ShaderManager *mShaderManager;
+    BitmapRenderer *mBitmapRenderer;
+    Vectorizer *mVectorizer;
 
     QVector<Manager *> mManagers;
 
     Window *mWindow;
-    Camera *mCamera;
+    EditModeCamera *mEditModeCamera;
+    ViewModeCamera *mViewModeCamera;
 
     float mIfps;
     bool mImGuiWantsMouseCapture;
     bool mImGuiWantsKeyboardCapture;
 
-    Mode mMode;
+    WorkMode mWorkMode;
+    SubWorkMode mSubWorkMode;
+    SubWorkMode mPreviousSubWorkMode;
+    ActionMode mActionMode;
     RenderMode mRenderMode;
     float mWidth;
     float mHeight;
@@ -67,6 +76,8 @@ private:
 
     int mSmoothIterations;
     int mQualityFactor;
+
+    QStringList mSupportedImageExtensions;
 
     // GUI
     QPen mDashedPen;

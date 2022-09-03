@@ -11,7 +11,10 @@
 Controller::Controller(QObject *parent)
     : QObject(parent)
     , mIfps(0.0f)
-    , mMode(Mode::Select)
+    , mWorkMode(WorkMode::Edit)
+    , mSubWorkMode(SubWorkMode::ViewOriginalImage)
+    , mPreviousSubWorkMode(SubWorkMode::ViewOriginalImage)
+    , mActionMode(ActionMode::Select)
     , mRenderMode(RenderMode::Contour)
     , mGlobalContourThickness(DEFAULT_CONTOUR_THICKNESS)
     , mGlobalDiffusionWidth(DEFAULT_DIFFUSION_WIDTH)
@@ -34,6 +37,11 @@ Controller::Controller(QObject *parent)
 
     mSolidPen.setWidthF(1.0f);
     mSolidPen.setJoinStyle(Qt::MiterJoin);
+
+    mSupportedImageExtensions << "*.png"
+                              << "*.jpg"
+                              << "*.jpeg"
+                              << "*.bmp";
 }
 
 Controller::~Controller() {}
@@ -47,13 +55,19 @@ void Controller::init()
     mRendererManager = RendererManager::instance();
     mCurveManager = CurveManager::instance();
     mShaderManager = ShaderManager::instance();
+    mBitmapRenderer = BitmapRenderer::instance();
+    mVectorizer = Vectorizer::instance();
 
-    mCamera = Camera::instance();
-    mCamera->setPixelRatio(mWindow->devicePixelRatio());
+    mEditModeCamera = EditModeCamera::instance();
+    mEditModeCamera->setPixelRatio(mWindow->devicePixelRatio());
+
+    mViewModeCamera = ViewModeCamera::instance();
+    mViewModeCamera->setPixelRatio(mWindow->devicePixelRatio());
 
     mManagers << mRendererManager //
               << mCurveManager    //
-              << mShaderManager;
+              << mShaderManager   //
+              << mBitmapRenderer;
 
     for (auto manager : mManagers)
         manager->init();
@@ -75,6 +89,9 @@ void Controller::init()
             case Action::ShowSaveAsPNGDialog:
                 onAction(Action::SaveAsPNG, path);
                 break;
+            case Action::ShowLoadImageDialog:
+                onAction(Action::VectorizeLoadedImage, path);
+                break;
             default:
                 break;
             }
@@ -93,7 +110,7 @@ void Controller::onAction(Action action, CustomVariant value)
     switch (action)
     {
     case Action::Select: {
-        mCurveManager->select(value.toVector2D(), mCamera->zoom() * 15.0f);
+        mCurveManager->select(value.toVector2D(), mEditModeCamera->zoom() * 15.0f);
         break;
     }
     case Action::AddControlPoint: {
@@ -157,6 +174,14 @@ void Controller::onAction(Action action, CustomVariant value)
         }
         break;
     }
+    case Action::VectorizeLoadedImage: {
+        mVectorizer->load(value.toString());
+        auto image = mVectorizer->image(Vectorizer::ImageType::Original);
+        mBitmapRenderer->setData(image, image.rows, image.cols);
+        mWorkMode = WorkMode::View;
+        mSubWorkMode = SubWorkMode::ViewOriginalImage;
+        break;
+    }
     case Action::SaveAsJSON: {
         Helper::saveCurveDataToJSON(mCurveManager->curves(), value.toString());
         break;
@@ -190,6 +215,12 @@ void Controller::onAction(Action action, CustomVariant value)
         mFileDialog->setDefaultSuffix(".png");
         mFileDialog->setNameFilter("*.png");
         mFileDialog->show();
+    case Action::ShowLoadImageDialog:
+        mLastFileAction = Action::ShowLoadImageDialog;
+        mFileDialog->setFileMode(QFileDialog::ExistingFile);
+        mFileDialog->setAcceptMode(QFileDialog::AcceptOpen);
+        mFileDialog->setNameFilters(mSupportedImageExtensions);
+        mFileDialog->show();
         break;
     }
 }
@@ -206,12 +237,12 @@ void Controller::render(float ifps)
 
     mPixelRatio = mWindow->devicePixelRatio();
 
-    // Update
-    mCamera->update(ifps);
-    mCamera->setPixelRatio(mPixelRatio);
-    mRendererManager->setRenderMode(mRenderMode);
+    // Update member classes
+    mEditModeCamera->setPixelRatio(mPixelRatio);
+    mViewModeCamera->setPixelRatio(mPixelRatio);
+    mBitmapRenderer->setPixelRatio(mPixelRatio);
     mRendererManager->setPixelRatio(mPixelRatio);
-    mCurveManager->sortCurves();
+    mRendererManager->setRenderMode(mRenderMode);
 
     if (mSelectedCurve)
     {
@@ -220,8 +251,8 @@ void Controller::render(float ifps)
         mBlurPoints = mSelectedCurve->blurPoints();
     } else
     {
-        if (mMode == Mode::AddColorPoint)
-            mMode = Mode::Select;
+        if (mActionMode == ActionMode::AddColorPoint)
+            mActionMode = ActionMode::Select;
 
         mControlPoints.clear();
         mColorPoints.clear();
@@ -229,7 +260,18 @@ void Controller::render(float ifps)
     }
 
     // Render
-    mRendererManager->render();
+    if (mWorkMode == WorkMode::Edit)
+    {
+        mCurveManager->sortCurves();
+        mEditModeCamera->update(ifps);
+        mRendererManager->render();
+    }
+
+    else if (mWorkMode == WorkMode::View)
+    {
+        mViewModeCamera->update(ifps);
+        mBitmapRenderer->render();
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, mPixelRatio * mWidth, mPixelRatio * mHeight);
@@ -254,6 +296,11 @@ void Controller::drawGUI()
     {
         if (ImGui::BeginMenu("File"))
         {
+            if (ImGui::MenuItem("Load an Image for Vectorization"))
+                onAction(Action::ShowLoadImageDialog);
+
+            ImGui::Separator();
+
             if (ImGui::MenuItem("Load from XML"))
                 onAction(Action::ShowLoadFromXMLDialog);
 
@@ -273,124 +320,147 @@ void Controller::drawGUI()
         ImGui::EndMenuBar();
     }
 
-    // Action Modes
+    // Work Modes
     {
-        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Actions Modes");
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Work Modes");
 
-        int mode = (int) mMode;
-        ImGui::RadioButton("Select", &mode, 0);
-        ImGui::RadioButton("Add Control Point (Ctrl)", &mode, 1);
-        ImGui::BeginDisabled(!mSelectedCurve);
-        ImGui::RadioButton("Add Color Point (Alt)", &mode, 2);
-        ImGui::RadioButton("Add Blur Point", &mode, 3);
-        ImGui::EndDisabled();
-        mMode = Mode(mode);
+        int mode = (int) mWorkMode;
+        ImGui::RadioButton("View", &mode, 0);
+        ImGui::RadioButton("Edit", &mode, 1);
+        mWorkMode = WorkMode(mode);
     }
 
-    ImGui::Spacing();
-
-    // Render Settings
+    // Sub Work Modes
+    if (mWorkMode == WorkMode::View)
     {
-        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Render Settings");
-        bool b0 = mRenderMode == RenderMode::Contour;
-        bool b1 = mRenderMode == RenderMode::Diffusion;
-        bool b2 = mRenderMode == RenderMode::ContourAndDiffusion;
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "SubWork Modes");
 
-        if (ImGui::Checkbox("Contours", &b0))
-            mRenderMode = RenderMode::Contour;
-
-        if (ImGui::Checkbox("Diffusion", &b1))
-            mRenderMode = RenderMode::Diffusion;
-
-        if (ImGui::Checkbox("Contours and Diffusion", &b2))
-            mRenderMode = RenderMode::ContourAndDiffusion;
-
-        if (ImGui::SliderInt("Smooth Iterations", &mSmoothIterations, 2, 50))
-            mRendererManager->setSmoothIterations(mSmoothIterations);
-
-        const char *names[3] = {"Empty", "Default", "High"};
-        const char *elem_name = names[mQualityFactor];
-
-        if (ImGui::SliderInt("Render Quality", &mQualityFactor, 1, 2, elem_name))
-            mRendererManager->setQualityFactor(mQualityFactor);
-
-        if (ImGui::SliderFloat("Global Blur Strength", &mGlobalBlurStrength, 0.0f, 1.0f))
-            mCurveManager->setGlobalBlurStrength(mGlobalBlurStrength);
-
-        if (ImGui::SliderFloat("Global Thickness", &mGlobalContourThickness, 2, 10))
-            mCurveManager->setGlobalContourThickness(mGlobalContourThickness);
-
-        if (ImGui::SliderFloat("Global Diffusion Width", &mGlobalDiffusionWidth, 2, 10))
-            mCurveManager->setGlobalDiffusionWidth(mGlobalDiffusionWidth);
-
-        if (ImGui::ColorEdit4("Global Contour Color", &mGlobalContourColor[0]))
-            mCurveManager->setGlobalContourColor(mGlobalContourColor);
+        int mode = (int) mSubWorkMode;
+        ImGui::RadioButton("View Original Image", &mode, 0);
+        mSubWorkMode = SubWorkMode(mode);
     }
 
-    ImGui::Spacing();
-
-    // Curve
-    if (mSelectedCurve)
+    if (mWorkMode == WorkMode::Edit)
     {
-        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Curve");
-        ImGui::Text("Number of Control Points: %d", (int) mSelectedCurve->controlPoints().size());
-        ImGui::Text("Number of Color Points: %d", (int) mSelectedCurve->getAllColorPoints().size());
-        ImGui::InputInt("Depth", &mSelectedCurve->mDepth);
-        ImGui::SliderFloat("Thickness", &mSelectedCurve->mContourThickness, 2, 50);
-        ImGui::SliderFloat("Diffusion Width", &mSelectedCurve->mDiffusionWidth, 2, 50);
-        ImGui::ColorEdit4("Contour Color", &mSelectedCurve->mContourColor[0]);
-        if (ImGui::Button("Remove Curve"))
-            onAction(Action::RemoveCurve);
+        // Action Modes
+        {
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "Actions Modes");
+
+            int mode = (int) mActionMode;
+            ImGui::RadioButton("Select", &mode, 0);
+            ImGui::RadioButton("Add Control Point (Ctrl)", &mode, 1);
+            ImGui::BeginDisabled(!mSelectedCurve);
+            ImGui::RadioButton("Add Color Point (Alt)", &mode, 2);
+            ImGui::RadioButton("Add Blur Point", &mode, 3);
+            ImGui::EndDisabled();
+            mActionMode = ActionMode(mode);
+        }
+
+        ImGui::Spacing();
+
+        // Render Settings
+        {
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "Render Settings");
+            bool b0 = mRenderMode == RenderMode::Contour;
+            bool b1 = mRenderMode == RenderMode::Diffusion;
+            bool b2 = mRenderMode == RenderMode::ContourAndDiffusion;
+
+            if (ImGui::Checkbox("Contours", &b0))
+                mRenderMode = RenderMode::Contour;
+
+            if (ImGui::Checkbox("Diffusion", &b1))
+                mRenderMode = RenderMode::Diffusion;
+
+            if (ImGui::Checkbox("Contours and Diffusion", &b2))
+                mRenderMode = RenderMode::ContourAndDiffusion;
+
+            if (ImGui::SliderInt("Smooth Iterations", &mSmoothIterations, 2, 50))
+                mRendererManager->setSmoothIterations(mSmoothIterations);
+
+            const char *names[3] = {"Empty", "Default", "High"};
+            const char *elem_name = names[mQualityFactor];
+
+            if (ImGui::SliderInt("Render Quality", &mQualityFactor, 1, 2, elem_name))
+                mRendererManager->setQualityFactor(mQualityFactor);
+
+            if (ImGui::SliderFloat("Global Blur Strength", &mGlobalBlurStrength, 0.0f, 1.0f))
+                mCurveManager->setGlobalBlurStrength(mGlobalBlurStrength);
+
+            if (ImGui::SliderFloat("Global Thickness", &mGlobalContourThickness, 2, 10))
+                mCurveManager->setGlobalContourThickness(mGlobalContourThickness);
+
+            if (ImGui::SliderFloat("Global Diffusion Width", &mGlobalDiffusionWidth, 2, 10))
+                mCurveManager->setGlobalDiffusionWidth(mGlobalDiffusionWidth);
+
+            if (ImGui::ColorEdit4("Global Contour Color", &mGlobalContourColor[0]))
+                mCurveManager->setGlobalContourColor(mGlobalContourColor);
+        }
+
+        ImGui::Spacing();
+
+        // Curve
+        if (mSelectedCurve)
+        {
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "Curve");
+            ImGui::Text("Number of Control Points: %d", (int) mSelectedCurve->controlPoints().size());
+            ImGui::Text("Number of Color Points: %d", (int) mSelectedCurve->getAllColorPoints().size());
+            ImGui::InputInt("Depth", &mSelectedCurve->mDepth);
+            ImGui::SliderFloat("Thickness", &mSelectedCurve->mContourThickness, 2, 50);
+            ImGui::SliderFloat("Diffusion Width", &mSelectedCurve->mDiffusionWidth, 2, 50);
+            ImGui::ColorEdit4("Contour Color", &mSelectedCurve->mContourColor[0]);
+            if (ImGui::Button("Remove Curve"))
+                onAction(Action::RemoveCurve);
+        }
+
+        ImGui::Spacing();
+
+        // Control Point
+        if (mSelectedControlPoint)
+        {
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "Control Point");
+            ImGui::InputFloat2("Position (x,y)", &mSelectedControlPoint->mPosition[0]);
+            if (ImGui::Button("Remove Control Point"))
+                onAction(Action::RemoveControlPoint);
+        }
+
+        ImGui::Spacing();
+
+        // Color Point
+        if (mSelectedColorPoint)
+        {
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "Color Point");
+
+            ImGui::Text("Direction: %s", mSelectedColorPoint->mDirection == ColorPoint::Direction::Left ? "Left" : "Right");
+            ImGui::SliderFloat("Position", &mSelectedColorPoint->mPosition, 0.0f, 1.0f);
+            ImGui::ColorEdit4("Color", &mSelectedColorPoint->mColor[0]);
+
+            if (ImGui::Button("Remove Color Point"))
+                onAction(Action::RemoveColorPoint);
+        }
+
+        ImGui::Spacing();
+
+        // Blur Point
+        if (mSelectedBlurPoint)
+        {
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "Blur Point");
+
+            ImGui::SliderFloat("Position", &mSelectedBlurPoint->mPosition, 0.0f, 1.0f);
+            ImGui::SliderFloat("Strength", &mSelectedBlurPoint->mStrength, 0.0f, 1.0f);
+
+            if (ImGui::Button("Remove Blur Point"))
+                onAction(Action::RemoveBlurPoint);
+        }
+
+        ImGui::Spacing();
+
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Info");
+        ImGui::Text("Number of Curves: %d", (int) mCurveManager->curves().size());
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+        if (ImGui::Button("Clear Canvas"))
+            onAction(Action::ClearCanvas);
     }
-
-    ImGui::Spacing();
-
-    // Control Point
-    if (mSelectedControlPoint)
-    {
-        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Control Point");
-        ImGui::InputFloat2("Position (x,y)", &mSelectedControlPoint->mPosition[0]);
-        if (ImGui::Button("Remove Control Point"))
-            onAction(Action::RemoveControlPoint);
-    }
-
-    ImGui::Spacing();
-
-    // Color Point
-    if (mSelectedColorPoint)
-    {
-        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Color Point");
-
-        ImGui::Text("Direction: %s", mSelectedColorPoint->mDirection == ColorPoint::Direction::Left ? "Left" : "Right");
-        ImGui::SliderFloat("Position", &mSelectedColorPoint->mPosition, 0.0f, 1.0f);
-        ImGui::ColorEdit4("Color", &mSelectedColorPoint->mColor[0]);
-
-        if (ImGui::Button("Remove Color Point"))
-            onAction(Action::RemoveColorPoint);
-    }
-
-    ImGui::Spacing();
-
-    // Blur Point
-    if (mSelectedBlurPoint)
-    {
-        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Blur Point");
-
-        ImGui::SliderFloat("Position", &mSelectedBlurPoint->mPosition, 0.0f, 1.0f);
-        ImGui::SliderFloat("Strength", &mSelectedBlurPoint->mStrength, 0.0f, 1.0f);
-
-        if (ImGui::Button("Remove Blur Point"))
-            onAction(Action::RemoveBlurPoint);
-    }
-
-    ImGui::Spacing();
-
-    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Info");
-    ImGui::Text("Number of Curves: %d", (int) mCurveManager->curves().size());
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-    if (ImGui::Button("Clear Canvas"))
-        onAction(Action::ClearCanvas);
 
     ImGui::End();
 
@@ -400,8 +470,7 @@ void Controller::drawGUI()
 
 void Controller::drawPainter()
 {
-    // QPainter stuff
-    if (mSelectedCurve)
+    if (mWorkMode == WorkMode::Edit && mSelectedCurve)
     {
         mDashedPen.setColor(QColor(0, 0, 0));
         mSolidPen.setColor(QColor(0, 0, 0));
@@ -415,8 +484,8 @@ void Controller::drawPainter()
         painter.setBrush(QBrush());
         for (int i = 0; i < mControlPoints.size() - 1; ++i)
         {
-            QPointF p0 = mCamera->toGUI(mControlPoints[i]->mPosition);
-            QPointF p1 = mCamera->toGUI(mControlPoints[i + 1]->mPosition);
+            QPointF p0 = mEditModeCamera->toGUI(mControlPoints[i]->mPosition);
+            QPointF p1 = mEditModeCamera->toGUI(mControlPoints[i + 1]->mPosition);
             painter.drawLine(p0, p1);
         }
 
@@ -424,8 +493,8 @@ void Controller::drawPainter()
 
         for (int i = 0; i < mBlurPoints.size(); ++i)
         {
-            QPointF visualPosition = mCamera->toGUI(mBlurPoints[i]->getPosition2D(mCamera->zoom() * BLUR_POINT_VISUAL_GAP));
-            QPointF actualPosition = mCamera->toGUI(mSelectedCurve->valueAt(mBlurPoints[i]->mPosition));
+            QPointF visualPosition = mEditModeCamera->toGUI(mBlurPoints[i]->getPosition2D(mEditModeCamera->zoom() * BLUR_POINT_VISUAL_GAP));
+            QPointF actualPosition = mEditModeCamera->toGUI(mSelectedCurve->valueAt(mBlurPoints[i]->mPosition));
 
             // Draw a dashed line actual position to visual position
             painter.setPen(mDenseDashedPen);
@@ -433,14 +502,14 @@ void Controller::drawPainter()
 
             // Outer disk
             float outerRadius = mBlurPoints[i]->mSelected ? 36 : 24;
-            outerRadius = qMin(outerRadius, outerRadius / mCamera->zoom());
+            outerRadius = qMin(outerRadius, outerRadius / mEditModeCamera->zoom());
             painter.setBrush(QColor(128, 128, 128, 128));
             painter.setPen(QColor(0, 0, 0, 0));
             painter.drawEllipse(visualPosition, outerRadius, outerRadius);
 
             // Inner disk
             float innerRadius = 8;
-            innerRadius = qMin(innerRadius, innerRadius / mCamera->zoom());
+            innerRadius = qMin(innerRadius, innerRadius / mEditModeCamera->zoom());
             painter.setBrush(QColor(255, 255, 255));
             painter.setPen(QColor(0, 0, 0, 0));
             painter.drawEllipse(visualPosition, innerRadius, innerRadius);
@@ -450,18 +519,18 @@ void Controller::drawPainter()
 
         for (int j = 0; j < mControlPoints.size(); ++j)
         {
-            QPointF center = mCamera->toGUI(mControlPoints[j]->mPosition);
+            QPointF center = mEditModeCamera->toGUI(mControlPoints[j]->mPosition);
 
             // Outer disk
             float outerRadius = mControlPoints[j]->mSelected ? 16 : 12;
-            outerRadius = qMin(outerRadius, outerRadius / mCamera->zoom());
+            outerRadius = qMin(outerRadius, outerRadius / mEditModeCamera->zoom());
             painter.setBrush(QColor(128, 128, 128, 128));
             painter.setPen(QColor(0, 0, 0, 0));
             painter.drawEllipse(center, outerRadius, outerRadius);
 
             // Inner disk
             float innerRadius = 6;
-            innerRadius = qMin(innerRadius, innerRadius / mCamera->zoom());
+            innerRadius = qMin(innerRadius, innerRadius / mEditModeCamera->zoom());
             painter.setBrush(QColor(255, 255, 255));
             painter.setPen(QColor(0, 0, 0, 0));
             painter.drawEllipse(center, innerRadius, innerRadius);
@@ -470,8 +539,8 @@ void Controller::drawPainter()
         // Color Points
         for (int i = 0; i < mColorPoints.size(); ++i)
         {
-            QPointF visualPosition = mCamera->toGUI(mColorPoints[i]->getPosition2D(mCamera->zoom() * COLOR_POINT_VISUAL_GAP));
-            QPointF actualPosition = mCamera->toGUI(mSelectedCurve->valueAt(mColorPoints[i]->mPosition));
+            QPointF visualPosition = mEditModeCamera->toGUI(mColorPoints[i]->getPosition2D(mEditModeCamera->zoom() * COLOR_POINT_VISUAL_GAP));
+            QPointF actualPosition = mEditModeCamera->toGUI(mSelectedCurve->valueAt(mColorPoints[i]->mPosition));
 
             // Draw a dashed line actual position to visual position
             painter.setPen(mDenseDashedPen);
@@ -479,14 +548,14 @@ void Controller::drawPainter()
 
             // Outer disk
             float outerRadius = mColorPoints[i]->mSelected ? 16 : 12;
-            outerRadius = qMin(outerRadius, outerRadius / mCamera->zoom());
+            outerRadius = qMin(outerRadius, outerRadius / mEditModeCamera->zoom());
             painter.setBrush(QColor(128, 128, 128, 128));
             painter.setPen(QColor(0, 0, 0, 0));
             painter.drawEllipse(visualPosition, outerRadius, outerRadius);
 
             // Inner disk
             float innerRadius = 6;
-            innerRadius = qMin(innerRadius, innerRadius / mCamera->zoom());
+            innerRadius = qMin(innerRadius, innerRadius / mEditModeCamera->zoom());
             painter.setBrush(QColor(255 * mColorPoints[i]->mColor.x(), //
                                     255 * mColorPoints[i]->mColor.y(),
                                     255 * mColorPoints[i]->mColor.z(),
@@ -504,7 +573,10 @@ void Controller::setWindow(Window *newWindow)
 
 void Controller::onWheelMoved(QWheelEvent *event)
 {
-    mCamera->onWheelMoved(event);
+    if (mWorkMode == WorkMode::Edit)
+        mEditModeCamera->onWheelMoved(event);
+    else if (mWorkMode == WorkMode::View)
+        mViewModeCamera->onWheelMoved(event);
 }
 
 void Controller::onMousePressed(QMouseEvent *event)
@@ -516,11 +588,15 @@ void Controller::onMousePressed(QMouseEvent *event)
 
     if (event->button() == Qt::LeftButton)
     {
-        onAction((Action) mMode, mCamera->toOpenGL(event->position()));
+        if (mWorkMode == WorkMode::Edit)
+            onAction((Action) mActionMode, mEditModeCamera->toOpenGL(event->position()));
 
     } else if (event->button() == Qt::MiddleButton)
     {
-        mCamera->onMousePressed(event);
+        if (mWorkMode == WorkMode::Edit)
+            mEditModeCamera->onMousePressed(event);
+        else if (mWorkMode == WorkMode::View)
+            mViewModeCamera->onMousePressed(event);
     }
 }
 
@@ -528,7 +604,8 @@ void Controller::onMouseReleased(QMouseEvent *event)
 {
     mPressedButton = Qt::NoButton;
 
-    mCamera->onMouseReleased(event);
+    mEditModeCamera->onMouseReleased(event);
+    mViewModeCamera->onMouseReleased(event);
 }
 
 void Controller::onMouseMoved(QMouseEvent *event)
@@ -538,20 +615,23 @@ void Controller::onMouseMoved(QMouseEvent *event)
 
     if (mPressedButton == Qt::LeftButton)
     {
-        if (mMode == Mode::Select)
+        if (mWorkMode == WorkMode::Edit && mActionMode == ActionMode::Select)
         {
             if (mSelectedColorPoint)
-                onAction(Action::UpdateColorPointPosition, mCamera->toOpenGL(event->position()));
+                onAction(Action::UpdateColorPointPosition, mEditModeCamera->toOpenGL(event->position()));
 
             if (mSelectedControlPoint)
-                onAction(Action::UpdateControlPointPosition, mCamera->toOpenGL(event->position()));
+                onAction(Action::UpdateControlPointPosition, mEditModeCamera->toOpenGL(event->position()));
 
             if (mSelectedBlurPoint)
-                onAction(Action::UpdateBlurPointPosition, mCamera->toOpenGL(event->position()));
+                onAction(Action::UpdateBlurPointPosition, mEditModeCamera->toOpenGL(event->position()));
         }
     }
 
-    mCamera->onMouseMoved(event);
+    if (mWorkMode == WorkMode::Edit)
+        mEditModeCamera->onMouseMoved(event);
+    else if (mWorkMode == WorkMode::View)
+        mViewModeCamera->onMouseMoved(event);
 }
 
 void Controller::onKeyPressed(QKeyEvent *event)
@@ -559,23 +639,26 @@ void Controller::onKeyPressed(QKeyEvent *event)
     if (mImGuiWantsKeyboardCapture)
         return;
 
-    if (event->key() == Qt::Key_Delete)
+    if (mWorkMode == WorkMode::Edit)
     {
-        if (mSelectedColorPoint)
-            onAction(Action::RemoveColorPoint);
-        else if (mSelectedControlPoint)
-            onAction(Action::RemoveControlPoint);
-        else if (mSelectedBlurPoint)
-            onAction(Action::RemoveBlurPoint);
-        else if (mSelectedCurve)
-            onAction(Action::RemoveCurve);
-    } else if (event->key() == Qt::Key_Alt)
-    {
-        if (mSelectedCurve)
-            mMode = Mode::AddColorPoint;
-    } else if (event->key() == Qt::Key_Control)
-    {
-        mMode = Mode::AddControlPoint;
+        if (event->key() == Qt::Key_Delete)
+        {
+            if (mSelectedColorPoint)
+                onAction(Action::RemoveColorPoint);
+            else if (mSelectedControlPoint)
+                onAction(Action::RemoveControlPoint);
+            else if (mSelectedBlurPoint)
+                onAction(Action::RemoveBlurPoint);
+            else if (mSelectedCurve)
+                onAction(Action::RemoveCurve);
+        } else if (event->key() == Qt::Key_Alt)
+        {
+            if (mSelectedCurve)
+                mActionMode = ActionMode::AddColorPoint;
+        } else if (event->key() == Qt::Key_Control)
+        {
+            mActionMode = ActionMode::AddControlPoint;
+        }
     }
 }
 
@@ -590,7 +673,9 @@ void Controller::resize(int w, int h)
     mWindow->makeCurrent();
     mWidth = w;
     mHeight = h;
-    mCamera->resize(w, h);
+    mEditModeCamera->resize(w, h);
+    mViewModeCamera->resize(w, h);
     mRendererManager->resize(w, h);
+    mBitmapRenderer->resize(w, h);
     mWindow->doneCurrent();
 }

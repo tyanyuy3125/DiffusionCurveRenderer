@@ -2,8 +2,8 @@
 #define RENDERERMANAGER_H
 
 #include "Bezier.h"
-#include "Camera.h"
 #include "Common.h"
+#include "EditModeCamera.h"
 
 #include "Manager.h"
 #include "Points.h"
@@ -47,7 +47,7 @@ private:
 private:
     ShaderManager *mShaderManager;
     CurveManager *mCurveManager;
-    Camera *mCamera;
+    EditModeCamera *mCamera;
 
     Points *mPoints;
     Quad *mQuad;

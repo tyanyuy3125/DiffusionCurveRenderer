@@ -1,8 +1,8 @@
-#include "Camera.h"
+#include "EditModeCamera.h"
 
 #include <QMatrix4x4>
 
-Camera::Camera(QObject *parent)
+EditModeCamera::EditModeCamera(QObject *parent)
     : QObject{parent}
     , mZNear(-1)
     , mZFar(1)
@@ -15,7 +15,7 @@ Camera::Camera(QObject *parent)
 
 {}
 
-void Camera::onMousePressed(QMouseEvent *event)
+void EditModeCamera::onMousePressed(QMouseEvent *event)
 {
     if (event->button() == Qt::MiddleButton)
     {
@@ -25,12 +25,12 @@ void Camera::onMousePressed(QMouseEvent *event)
     }
 }
 
-void Camera::onMouseReleased(QMouseEvent *event)
+void EditModeCamera::onMouseReleased(QMouseEvent *event)
 {
     mMouse.pressed = false;
 }
 
-void Camera::onMouseMoved(QMouseEvent *event)
+void EditModeCamera::onMouseMoved(QMouseEvent *event)
 {
     if (mMouse.pressed)
     {
@@ -43,7 +43,7 @@ void Camera::onMouseMoved(QMouseEvent *event)
     }
 }
 
-void Camera::onWheelMoved(QWheelEvent *event)
+void EditModeCamera::onWheelMoved(QWheelEvent *event)
 {
     QVector2D cursorWorldPosition = toOpenGL(event->position());
 
@@ -52,7 +52,7 @@ void Camera::onWheelMoved(QWheelEvent *event)
     else
         mZoom = mZoom / 1.1f;
 
-    mZoom = qMax(0.01f, qMin(1.0f, mZoom));
+    mZoom = qMax(0.001f, qMin(10.0f, mZoom));
 
     QVector2D newWorldPosition = toOpenGL(event->position());
     QVector2D delta = cursorWorldPosition - newWorldPosition;
@@ -60,13 +60,13 @@ void Camera::onWheelMoved(QWheelEvent *event)
     mTop += delta.y();
 }
 
-void Camera::resize(int width, int height)
+void EditModeCamera::resize(int width, int height)
 {
     mWidth = width;
     mHeight = height;
 }
 
-void Camera::update(float ifps)
+void EditModeCamera::update(float ifps)
 {
     if (mUpdatePosition)
     {
@@ -78,9 +78,10 @@ void Camera::update(float ifps)
     }
 }
 
-QMatrix4x4 Camera::projection() const
+QMatrix4x4 EditModeCamera::projection() const
 {
     QMatrix4x4 projection;
+
     projection.ortho(mLeft, //
                      mLeft + mWidth * mZoom,
                      mTop + mHeight * mZoom,
@@ -91,12 +92,12 @@ QMatrix4x4 Camera::projection() const
     return projection;
 }
 
-QVector2D Camera::toOpenGL(const QPointF &position) const
+QVector2D EditModeCamera::toOpenGL(const QPointF &position) const
 {
     return QVector2D(mLeft + mZoom * position.x(), mTop + mZoom * position.y());
 }
 
-QPointF Camera::toGUI(const QPointF &position) const
+QPointF EditModeCamera::toGUI(const QPointF &position) const
 {
     float x = position.x() - mLeft;
     float y = position.y() - mTop;
@@ -104,12 +105,12 @@ QPointF Camera::toGUI(const QPointF &position) const
     return QPointF(x * mPixelRatio / mZoom, y * mPixelRatio / mZoom);
 }
 
-QPointF Camera::toGUI(const QVector2D &position) const
+QPointF EditModeCamera::toGUI(const QVector2D &position) const
 {
     return toGUI(position.toPointF());
 }
 
-QRectF Camera::toGUI(const QRectF &rect) const
+QRectF EditModeCamera::toGUI(const QRectF &rect) const
 {
     float w = rect.width() * mPixelRatio / mZoom;
     float h = rect.height() * mPixelRatio / mZoom;
@@ -119,38 +120,44 @@ QRectF Camera::toGUI(const QRectF &rect) const
     return QRectF(center.x() - 0.5 * w, center.y() - 0.5 * h, w, h);
 }
 
-void Camera::setPixelRatio(float newPixelRatio)
+void EditModeCamera::setPixelRatio(float newPixelRatio)
 {
     mPixelRatio = newPixelRatio;
 }
 
-float Camera::left() const
+float EditModeCamera::left() const
 {
     return mLeft;
 }
 
-void Camera::setLeft(float newLeft)
+void EditModeCamera::setLeft(float newLeft)
 {
     mLeft = newLeft;
 }
 
-float Camera::top() const
+float EditModeCamera::top() const
 {
     return mTop;
 }
 
-void Camera::setTop(float newTop)
+void EditModeCamera::setTop(float newTop)
 {
     mTop = newTop;
 }
 
-Camera *Camera::instance()
-{
-    static Camera camera;
-    return &camera;
-}
-
-float Camera::zoom() const
+float EditModeCamera::zoom() const
 {
     return mZoom;
+}
+
+void EditModeCamera::setZoom(float newZoom)
+{
+    mZoom = newZoom;
+}
+
+EditModeCamera *EditModeCamera::instance()
+{
+    static EditModeCamera instance;
+
+    return &instance;
 }
