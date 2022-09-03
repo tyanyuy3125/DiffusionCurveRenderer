@@ -21,6 +21,7 @@ SOURCES += \
     CurveManager.cpp \
     CustomVariant.cpp \
     Framebuffer.cpp \
+    GaussianStack.cpp \
     Helper.cpp \
     Main.cpp \
     Manager.cpp \
@@ -43,6 +44,7 @@ HEADERS += \
     CurveManager.h \
     CustomVariant.h \
     Framebuffer.h \
+    GaussianStack.h \
     Helper.h \
     Manager.h \
     Points.h \
@@ -59,3 +61,12 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 RESOURCES += \
     Resources.qrc
+
+
+INCLUDEPATH += $$PWD/Dependencies/opencv-4.6.0/include
+DEPENDPATH += $$PWD/Dependencies/opencv-4.6.0/include
+
+LIBS += \
+-L$$PWD/Dependencies/opencv-4.6.0/x64/vc16/lib/ -lopencv_core460 \
+-L$$PWD/Dependencies/opencv-4.6.0/x64/vc16/lib/ -lopencv_imgproc460
+
