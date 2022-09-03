@@ -19,14 +19,14 @@ public:
         Right
     };
 
-private:
-    Bezier *mParent;
-
 public:
     QVector4D mColor;
     float mPosition;
     bool mSelected;
     Direction mDirection;
+
+private:
+    Bezier *mParent;
 };
 
 #endif // COLORPOINT_H

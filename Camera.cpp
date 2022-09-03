@@ -6,7 +6,7 @@ Camera::Camera(QObject *parent)
     : QObject{parent}
     , mZNear(-1)
     , mZFar(1)
-    , mZoom(1)
+    , mZoom(1.0f)
     , mLeft(0)
     , mTop(0)
     , mWidth(1600)
@@ -101,7 +101,7 @@ QPointF Camera::toGUI(const QPointF &position) const
     float x = position.x() - mLeft;
     float y = position.y() - mTop;
 
-    return QPointF(x / mZoom * mPixelRatio, y / mZoom * mPixelRatio);
+    return QPointF(x * mPixelRatio / mZoom, y * mPixelRatio / mZoom);
 }
 
 QPointF Camera::toGUI(const QVector2D &position) const
@@ -111,8 +111,8 @@ QPointF Camera::toGUI(const QVector2D &position) const
 
 QRectF Camera::toGUI(const QRectF &rect) const
 {
-    float w = rect.width() / mZoom * mPixelRatio;
-    float h = rect.height() / mZoom * mPixelRatio;
+    float w = rect.width() * mPixelRatio / mZoom;
+    float h = rect.height() * mPixelRatio / mZoom;
 
     QPointF center = toGUI(QPointF(rect.center().x(), rect.center().y()));
 
@@ -122,6 +122,26 @@ QRectF Camera::toGUI(const QRectF &rect) const
 void Camera::setPixelRatio(float newPixelRatio)
 {
     mPixelRatio = newPixelRatio;
+}
+
+float Camera::left() const
+{
+    return mLeft;
+}
+
+void Camera::setLeft(float newLeft)
+{
+    mLeft = newLeft;
+}
+
+float Camera::top() const
+{
+    return mTop;
+}
+
+void Camera::setTop(float newTop)
+{
+    mTop = newTop;
 }
 
 Camera *Camera::instance()

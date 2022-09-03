@@ -34,6 +34,12 @@ public:
 
     void setPixelRatio(float newPixelRatio);
 
+    float left() const;
+    void setLeft(float newLeft);
+
+    float top() const;
+    void setTop(float newTop);
+
 private:
     float mZNear;
     float mZFar;

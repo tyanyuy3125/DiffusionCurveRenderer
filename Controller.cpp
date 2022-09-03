@@ -17,11 +17,12 @@ Controller::Controller(QObject *parent)
     , mGlobalDiffusionWidth(DEFAULT_DIFFUSION_WIDTH)
     , mGlobalContourColor(DEFAULT_CONTOUR_COLOR)
     , mGlobalBlurStrength(DEFAULT_BLUR_STRENGTH)
+    , mSmoothIterations(20)
+    , mQualityFactor(1)
     , mSelectedCurve(nullptr)
     , mSelectedControlPoint(nullptr)
     , mSelectedColorPoint(nullptr)
     , mSelectedBlurPoint(nullptr)
-
 {
     mDashedPen.setDashPattern({8, 8});
     mDashedPen.setWidthF(1.0f);
@@ -204,7 +205,6 @@ void Controller::render(float ifps)
     mSelectedBlurPoint = mCurveManager->selectedBlurPoint();
 
     mPixelRatio = mWindow->devicePixelRatio();
-    mSmoothIterations = mRendererManager->smoothIterations();
 
     // Update
     mCamera->update(ifps);
@@ -307,6 +307,12 @@ void Controller::drawGUI()
 
         if (ImGui::SliderInt("Smooth Iterations", &mSmoothIterations, 2, 50))
             mRendererManager->setSmoothIterations(mSmoothIterations);
+
+        const char *names[3] = {"Empty", "Default", "High"};
+        const char *elem_name = names[mQualityFactor];
+
+        if (ImGui::SliderInt("Render Quality", &mQualityFactor, 1, 2, elem_name))
+            mRendererManager->setQualityFactor(mQualityFactor);
 
         if (ImGui::SliderFloat("Global Blur Strength", &mGlobalBlurStrength, 0.0f, 1.0f))
             mCurveManager->setGlobalBlurStrength(mGlobalBlurStrength);

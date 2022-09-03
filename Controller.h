@@ -65,6 +65,9 @@ private:
     QVector4D mGlobalContourColor;
     float mGlobalBlurStrength;
 
+    int mSmoothIterations;
+    int mQualityFactor;
+
     // GUI
     QPen mDashedPen;
     QPen mSolidPen;
@@ -83,8 +86,6 @@ private:
     QList<ControlPoint *> mControlPoints;
     QList<ColorPoint *> mColorPoints;
     QList<BlurPoint *> mBlurPoints;
-
-    int mSmoothIterations;
 };
 
 #endif // CONTROLLER_H

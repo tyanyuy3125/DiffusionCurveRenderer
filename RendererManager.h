@@ -27,8 +27,8 @@ public:
     void setRenderMode(RenderMode newRenderMode);
     void setPixelRatio(float newPixelRatio);
 
-    int smoothIterations() const;
     void setSmoothIterations(int newSmoothIterations);
+    void setQualityFactor(float newQualityFactor);
 
     void save(const QString &path);
 
@@ -71,6 +71,7 @@ private:
     QVector<QOpenGLFramebufferObject *> mTemporaryFrameBuffers;
 
     int mSmoothIterations;
+    float mQualityFactor;
 
     bool mSave;
     QString mSavePath;

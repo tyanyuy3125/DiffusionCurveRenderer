@@ -15,10 +15,12 @@ public:
     QVector2D getPosition2D(float gap = BLUR_POINT_VISUAL_GAP) const;
 
 public:
-    Bezier *mParent;
     float mStrength;
     float mPosition;
     bool mSelected;
+
+private:
+    Bezier *mParent;
 };
 
 #endif // BLURPOINT_H
