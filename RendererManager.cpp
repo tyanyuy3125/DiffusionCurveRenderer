@@ -62,6 +62,12 @@ void RendererManager::render()
     if (mRenderMode == RenderMode::Diffusion)
     {
         renderDiffusion(nullptr, true);
+
+        // If a curve is selected then render it
+        if (mCurveManager->selectedCurve())
+        {
+            renderContour(nullptr, mCurveManager->selectedCurve(), false);
+        }
     }
 
     if (mRenderMode == RenderMode::Contour)
@@ -217,7 +223,7 @@ void RendererManager::renderDiffusion(QOpenGLFramebufferObject *target, bool cle
         upsample(mUpsampleFramebuffers[i], mTemporaryFrameBuffers[i], mUpsampleFramebuffers[i + 1], mDownsampleFramebuffers[i]);
     }
 
-    //        mUpsampleFramebuffers[0]->toImage().save("000.bmp");
+    mUpsampleFramebuffers[0]->toImage().save("000.bmp");
 
     // Last Pass Blur
     drawFinalBlurCurves(mUpsampleFramebuffers[0]);
@@ -265,6 +271,63 @@ void RendererManager::renderDiffusion(QOpenGLFramebufferObject *target, bool cle
         mShaderManager->setUniformValue("heightRatio", mQualityFactor * float(mHeight) / mUpsampleFramebuffers[0]->height());
         mQuad->render();
         mShaderManager->release();
+    }
+}
+
+void RendererManager::renderContour(QOpenGLFramebufferObject *target, Bezier *curve, bool clearTarget)
+{
+    if (target)
+    {
+        mCamera->resize(target->width(), target->height());
+
+        target->bind();
+        glViewport(0, 0, target->width(), target->height());
+
+        if (clearTarget)
+        {
+            glClearColor(1, 1, 1, 1);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+
+    } else
+    {
+        // Render to the default framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, mPixelRatio * mWidth, mPixelRatio * mHeight);
+
+        if (clearTarget)
+        {
+            glClearColor(1, 1, 1, 1);
+            glClear(GL_COLOR_BUFFER_BIT);
+        }
+    }
+
+    mShaderManager->bind(ShaderType::ContourShader);
+    mPoints->bind();
+    mShaderManager->setUniformValue("projection", mCamera->projection());
+    mShaderManager->setUniformValue("pointDelta", mPoints->delta());
+    mShaderManager->setUniformValue("zoom", mCamera->zoom());
+
+    if (curve)
+    {
+        QVector<QVector2D> controlPoints = curve->getControlPointPositions();
+        mShaderManager->setUniformValue("color", curve->mContourColor);
+        mShaderManager->setUniformValue("thickness", curve->mContourThickness);
+        mShaderManager->setUniformValue("controlPointsCount", (int) controlPoints.size());
+        mShaderManager->setUniformValueArray("controlPoints", controlPoints);
+
+        glDrawArrays(GL_POINTS, 0, mPoints->size());
+    }
+
+    mPoints->release();
+    mShaderManager->release();
+
+    if (target)
+    {
+        // Restore
+        target->release();
+        mCamera->resize(mWidth, mHeight);
+        glViewport(0, 0, mPixelRatio * mWidth, mPixelRatio * mHeight);
     }
 }
 

@@ -35,6 +35,7 @@ public:
 private:
     void renderContours(QOpenGLFramebufferObject *target, bool clearTarget = true);
     void renderDiffusion(QOpenGLFramebufferObject *target, bool clearTarget = true);
+    void renderContour(QOpenGLFramebufferObject *target, Bezier *curve, bool clearTarget = true);
     void createFramebuffers();
     void deleteFramebuffers();
 
