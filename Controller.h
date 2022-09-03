@@ -8,13 +8,14 @@
 #include "EditModeCamera.h"
 #include "RendererManager.h"
 #include "ShaderManager.h"
-#include "Vectorizer.h"
+#include "Vectorization/Vectorizer.h"
 #include "ViewModeCamera.h"
 
 #include <QObject>
 
 #include <imgui.h>
 #include <QFileDialog>
+#include <QFuture>
 #include <QPen>
 #include <QtImGui.h>
 
@@ -78,6 +79,8 @@ private:
     int mQualityFactor;
 
     QStringList mSupportedImageExtensions;
+
+    QFuture<void> mVectorizationLoadFunctionFuture;
 
     // GUI
     QPen mDashedPen;

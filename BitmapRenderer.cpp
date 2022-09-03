@@ -41,7 +41,7 @@ void BitmapRenderer::render()
     mShaderManager->release();
 }
 
-void BitmapRenderer::setData(cv::Mat image, int width, int height)
+void BitmapRenderer::setData(cv::Mat image, int width, int height, GLenum format)
 {
     if (mTexture)
         glDeleteTextures(1, &mTexture);
@@ -54,7 +54,7 @@ void BitmapRenderer::setData(cv::Mat image, int width, int height)
     mImageTransformation.setColumn(3, QVector4D(0, 0, 0, 1));
 
     glBindTexture(GL_TEXTURE_2D, mTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, mTextureWidth, mTextureHeight, 0, GL_BGR, GL_UNSIGNED_BYTE, image.ptr());
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, mTextureWidth, mTextureHeight, 0, format, GL_UNSIGNED_BYTE, image.ptr());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);

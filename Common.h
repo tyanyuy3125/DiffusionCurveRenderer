@@ -31,7 +31,10 @@ enum class WorkMode { //
 };
 
 enum class SubWorkMode { //
-    ViewOriginalImage
+    ViewOriginalImage,
+    ViewEdges,
+    ViewGaussianStack,
+    ViewEdgeStack
 };
 
 enum class ActionMode { //
@@ -70,6 +73,15 @@ enum class Action { //
     ShowSaveAsJSONDialog,
     ShowLoadImageDialog,
     ClearCanvas
+
+};
+
+enum class VectorizationStatus {
+    Ready,
+    Finished,
+    CreatingGaussianStack,
+    CreatingEdgeStack,
+    TracingEdges,
 
 };
 

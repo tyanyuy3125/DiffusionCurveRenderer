@@ -20,6 +20,7 @@ class Window : public QOpenGLWindow, protected QOpenGLExtraFunctions
 
 public:
     Window(QWindow *parent = nullptr);
+    ~Window();
 
 private:
     void initializeGL() override;

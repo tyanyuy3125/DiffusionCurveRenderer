@@ -11,9 +11,16 @@
 
 Window::Window(QWindow *parent)
     : QOpenGLWindow(QOpenGLWindow::UpdateBehavior::NoPartialUpdate, parent)
+    , mController(nullptr)
 
 {
     connect(this, &QOpenGLWindow::frameSwapped, this, [=]() { update(); });
+}
+
+Window::~Window()
+{
+    if (mController)
+        mController->deleteLater();
 }
 
 void Window::initializeGL()

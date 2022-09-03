@@ -7,6 +7,7 @@
 #include <QOpenGLPaintDevice>
 #include <QPaintDevice>
 #include <QPainter>
+#include <QtConcurrent>
 
 Controller::Controller(QObject *parent)
     : QObject(parent)
@@ -44,7 +45,11 @@ Controller::Controller(QObject *parent)
                               << "*.bmp";
 }
 
-Controller::~Controller() {}
+Controller::~Controller()
+{
+    qDebug() << Q_FUNC_INFO;
+    mVectorizationLoadFunctionFuture.cancel();
+}
 
 void Controller::init()
 {
@@ -175,9 +180,9 @@ void Controller::onAction(Action action, CustomVariant value)
         break;
     }
     case Action::VectorizeLoadedImage: {
-        mVectorizer->load(value.toString());
-        auto image = mVectorizer->image(Vectorizer::ImageType::Original);
-        mBitmapRenderer->setData(image, image.rows, image.cols);
+        mVectorizationLoadFunctionFuture = QtConcurrent::run([=]() { //
+            mVectorizer->load(value.toString());
+        });
         mWorkMode = WorkMode::View;
         mSubWorkMode = SubWorkMode::ViewOriginalImage;
         break;
@@ -265,9 +270,7 @@ void Controller::render(float ifps)
         mCurveManager->sortCurves();
         mEditModeCamera->update(ifps);
         mRendererManager->render();
-    }
-
-    else if (mWorkMode == WorkMode::View)
+    } else if (mWorkMode == WorkMode::View)
     {
         mViewModeCamera->update(ifps);
         mBitmapRenderer->render();
@@ -330,14 +333,9 @@ void Controller::drawGUI()
         mWorkMode = WorkMode(mode);
     }
 
-    // Sub Work Modes
     if (mWorkMode == WorkMode::View)
     {
-        ImGui::TextColored(ImVec4(1, 1, 0, 1), "SubWork Modes");
-
-        int mode = (int) mSubWorkMode;
-        ImGui::RadioButton("View Original Image", &mode, 0);
-        mSubWorkMode = SubWorkMode(mode);
+        mVectorizer->drawGui();
     }
 
     if (mWorkMode == WorkMode::Edit)

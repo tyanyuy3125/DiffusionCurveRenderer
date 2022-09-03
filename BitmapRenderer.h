@@ -18,7 +18,7 @@ private:
 public:
     bool init() override;
     void render();
-    void setData(cv::Mat image, int width, int height);
+    void setData(cv::Mat image, int width, int height, GLenum format);
     void resize(int width, int height);
     void setPixelRatio(float newPixelRatio);
 
