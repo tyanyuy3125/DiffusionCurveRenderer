@@ -252,6 +252,7 @@ void Controller::render(float ifps)
     if (mShowFileDailog)
     {
         mShowFileDailog = false;
+
         switch (mFileDailogType)
         {
         case FileDialogType::LoadFromXML: {
@@ -264,21 +265,18 @@ void Controller::render(float ifps)
             QString path = QFileDialog::getOpenFileName(nullptr, "Select a JSON file", QString(), "*.json");
             if (!path.isNull())
                 onAction(Action::LoadFromJSON, path);
-
             break;
         }
         case FileDialogType::SaveAsPNG: {
             QString path = QFileDialog::getSaveFileName(nullptr, "Save as PNG", "", "*.png");
             if (!path.isNull())
                 onAction(Action::SaveAsPNG, path);
-
             break;
         }
         case FileDialogType::SaveAsJSON: {
             QString path = QFileDialog::getSaveFileName(nullptr, "Save as JSON", "", "*.json");
             if (!path.isNull())
                 onAction(Action::SaveAsJSON, path);
-
             break;
         }
         case FileDialogType::LoadVectorizerImage: {
@@ -333,7 +331,9 @@ void Controller::drawGUI()
         ImGui::TextColored(ImVec4(1, 1, 0, 1), "Work Modes");
 
         int mode = (int) mWorkMode;
+        ImGui::BeginDisabled(!mVectorizerImageLoaded);
         ImGui::RadioButton("View", &mode, 0);
+        ImGui::EndDisabled();
         ImGui::RadioButton("Edit", &mode, 1);
         mWorkMode = WorkMode(mode);
     }
