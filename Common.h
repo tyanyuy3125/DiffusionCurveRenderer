@@ -82,6 +82,8 @@ enum class VectorizationStatus {
     CreatingGaussianStack,
     CreatingEdgeStack,
     TracingEdges,
+    CreatingPolylines,
+    ConstructingCurves
 
 };
 

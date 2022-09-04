@@ -1,11 +1,12 @@
 #ifndef VECTORIZER_H
 #define VECTORIZER_H
 
+#include "Bezier.h"
 #include "BitmapRenderer.h"
+#include "CurveManager.h"
 #include "EdgeStack.h"
 #include "GaussianStack.h"
 #include "PixelChain.h"
-#include "Window.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/core/mat.hpp>
@@ -32,26 +33,33 @@ private:
     void traceEdgePixels(QVector<PixelChain> &chains, cv::Mat edges, int lengthThreshold);
     void potrace(QVector<Point> &polyline, PixelChain chain);
     void findBestPath(QVector<Point> &bestPath, PixelChain chain, Eigen::MatrixXd penalties);
+    void constructCurves(QVector<Bezier *> &curves, const QVector<QVector<Point>> &polylines);
+    Bezier *constructCurve(const QVector<Point> &polyline, double tension = 2.0);
 
 private:
     BitmapRenderer *mBitmapRenderer;
-    SubWorkMode mSubWorkMode;
-    VectorizationStatus mVectorizationStatus;
+    CurveManager *mCurveManager;
 
-    cv::Mat mOriginalImage;
-    cv::Mat mEdgeImage;
     double mCannyUpperThreshold;
     double mCannyLowerThreshold;
 
+    // Updated when an image is loaded
+    cv::Mat mOriginalImage;
+    cv::Mat mEdgeImage;
     GaussianStack *mGaussianStack;
     EdgeStack *mEdgeStack;
     QVector<PixelChain> mChains;
+    QVector<QVector<Point>> mPolylines;
+
+    SubWorkMode mSubWorkMode;
+    VectorizationStatus mVectorizationStatus;
 
     // GUI Stuff
     int mSelectedGaussianLayer;
     int mSelectedEdgeLayer;
     bool mInit;
     bool mUpdateInitialData;
+    float mProgress;
 };
 
 #endif // VECTORIZER_H

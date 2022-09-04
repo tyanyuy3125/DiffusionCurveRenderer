@@ -46,12 +46,21 @@ double Point::sqdist(Point o) const
     return (x - o.x) * (x - o.x) + (y - o.y) * (y - o.y);
 }
 
-Eigen::Vector2f Point::toVector()
+Eigen::Vector2f Point::toVector() const
 {
     Eigen::Vector2f converted;
     converted << this->x, this->y;
 
     return converted;
+}
+
+ControlPoint *Point::toControlPoint() const
+{
+    ControlPoint *controlPoint = new ControlPoint;
+    controlPoint->mSelected = false;
+    controlPoint->mPosition = QVector2D(this->x, this->y);
+
+    return controlPoint;
 }
 
 bool Point::operator==(const Point &rhs) const

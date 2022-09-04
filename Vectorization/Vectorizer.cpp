@@ -5,44 +5,71 @@
 
 #include <QDebug>
 
-typedef Eigen::Vector2f Vector2;
-
 Vectorizer::Vectorizer()
-    : mSubWorkMode(SubWorkMode::ViewOriginalImage)
-    , mVectorizationStatus(VectorizationStatus::Ready)
-    , mCannyUpperThreshold(200.0f)
-    , mCannyLowerThreshold(80.0f)
+    : mCannyUpperThreshold(200.0f)
+    , mCannyLowerThreshold(20.0f)
     , mGaussianStack(nullptr)
     , mEdgeStack(nullptr)
+    , mSubWorkMode(SubWorkMode::ViewOriginalImage)
+    , mVectorizationStatus(VectorizationStatus::Ready)
     , mSelectedGaussianLayer(0)
     , mSelectedEdgeLayer(0)
     , mInit(false)
     , mUpdateInitialData(false)
+    , mProgress(0.0f)
 {
     mBitmapRenderer = BitmapRenderer::instance();
+    mCurveManager = CurveManager::instance();
 }
 
 void Vectorizer::load(const QString &path)
 {
+    mProgress = 0.0f;
     mUpdateInitialData = false;
     clear();
 
-    mOriginalImage = cv::imread(path.toStdString(), cv::IMREAD_REDUCED_COLOR_2);
+    mOriginalImage = cv::imread(path.toStdString(), cv::IMREAD_COLOR);
 
     cv::Canny(mOriginalImage, mEdgeImage, mCannyUpperThreshold, mCannyLowerThreshold);
 
     mVectorizationStatus = VectorizationStatus::CreatingGaussianStack;
     mGaussianStack = new GaussianStack(mOriginalImage);
+    mProgress = 0.2f;
 
     mVectorizationStatus = VectorizationStatus::CreatingEdgeStack;
     mEdgeStack = new EdgeStack(mGaussianStack, mCannyLowerThreshold, mCannyUpperThreshold);
+    mProgress = 0.4f;
 
     mVectorizationStatus = VectorizationStatus::TracingEdges;
-    traceEdgePixels(mChains, mEdgeStack->layer(1), 5);
+    traceEdgePixels(mChains, mEdgeStack->layer(0), 15);
+    mProgress = 0.6f;
 
     qInfo() << "Chains detected."
             << "Number of chains is:" << mChains.size();
 
+    // Create polylines
+    mVectorizationStatus = VectorizationStatus::CreatingPolylines;
+
+    for (int i = 0; i < mChains.size(); i++)
+    {
+        mProgress = 0.6f + 0.2f * float(i) / mChains.size();
+
+        PixelChain chain = mChains.at(i);
+        QVector<Point> polyline;
+        potrace(polyline, chain);
+        mPolylines.emplace_back(polyline);
+    }
+
+    // Now construct curves using polylines
+    mVectorizationStatus = VectorizationStatus::ConstructingCurves;
+    QVector<Bezier *> curves;
+    constructCurves(curves, mPolylines);
+
+    // Set new curves
+    mCurveManager->clear();
+    mCurveManager->addCurves(curves);
+
+    mProgress = 1.0f;
     mSubWorkMode = SubWorkMode::ViewOriginalImage;
     mVectorizationStatus = VectorizationStatus::Finished;
     mInit = true;
@@ -56,16 +83,29 @@ void Vectorizer::drawGui()
     if (mVectorizationStatus == VectorizationStatus::CreatingGaussianStack)
     {
         ImGui::Text("Status: Creating Gaussian Stack...");
+        ImGui::ProgressBar(mProgress);
         return;
 
     } else if (mVectorizationStatus == VectorizationStatus::CreatingEdgeStack)
     {
         ImGui::Text("Status: Creating Edge Stack...");
+        ImGui::ProgressBar(mProgress);
         return;
 
     } else if (mVectorizationStatus == VectorizationStatus::TracingEdges)
     {
-        ImGui::Text("Status: TracingEdges...");
+        ImGui::Text("Status: Tracing Edges...");
+        ImGui::ProgressBar(mProgress);
+        return;
+    } else if (mVectorizationStatus == VectorizationStatus::CreatingPolylines)
+    {
+        ImGui::Text("Status: Creating Polylines...");
+        ImGui::ProgressBar(mProgress);
+        return;
+    } else if (mVectorizationStatus == VectorizationStatus::ConstructingCurves)
+    {
+        ImGui::Text("Status: Constructing Curves...");
+        ImGui::ProgressBar(mProgress);
         return;
     }
 
@@ -140,6 +180,8 @@ void Vectorizer::clear()
         delete mEdgeStack;
 
     mChains.clear();
+
+    mPolylines.clear();
 }
 
 /*
@@ -171,6 +213,8 @@ void Vectorizer::traceEdgePixels(QVector<PixelChain> &chains, cv::Mat edges, int
 
     for (int i = 0; i < nEdgePixels; i++)
     {
+        mProgress = 0.4f + 0.2f * float(i) / nEdgePixels;
+
         int row = nonZeros.at<cv::Point>(i).y;
         int col = nonZeros.at<cv::Point>(i).x;
 
@@ -308,20 +352,20 @@ void Vectorizer::potrace(QVector<Point> &polyline, PixelChain chain)
         {
             bool isStraightPath = true;
 
-            Vector2 pointI = chain.get(i).toVector();
-            Vector2 pointK = chain.get(k).toVector();
+            Eigen::Vector2f pointI = chain.get(i).toVector();
+            Eigen::Vector2f pointK = chain.get(k).toVector();
 
             // Check that all points between I and K are close enough to the
             // straight line connecting them.
             for (int j = i + 1; j < k; j++)
             {
-                Vector2 pointJ = chain.get(j).toVector();
+                Eigen::Vector2f pointJ = chain.get(j).toVector();
 
-                Vector2 lineItoK = pointK - pointI;
-                Vector2 lineItoJ = pointJ - pointI;
+                Eigen::Vector2f lineItoK = pointK - pointI;
+                Eigen::Vector2f lineItoJ = pointJ - pointI;
 
                 double coefficient = lineItoJ.dot(lineItoK) / lineItoK.squaredNorm();
-                Vector2 dispJFromLine = lineItoJ - coefficient * lineItoK;
+                Eigen::Vector2f dispJFromLine = lineItoJ - coefficient * lineItoK;
 
                 // Discard the line if any point J is further than one unit
                 // off the line.
@@ -459,4 +503,121 @@ void Vectorizer::findBestPath(QVector<Point> &bestPath, PixelChain chain, Eigen:
         Point point = chain.get(bestPathIndices.at(i));
         bestPath.push_back(point);
     }
+}
+
+void Vectorizer::constructCurves(QVector<Bezier *> &curves, const QVector<QVector<Point>> &polylines)
+{
+    for (int i = 0; i < polylines.size(); i++)
+    {
+        mProgress = 0.8f + 0.1f * float(i) / polylines.size();
+
+        Bezier *curve = constructCurve(polylines.at(i));
+
+        if (curve)
+        {
+            // Split curve into several curves because we support Beizer curves having at most 32 control points
+            if (curve->controlPoints().size() >= 29)
+            {
+                QList<ControlPoint *> controlPoints = curve->controlPoints();
+
+                QList<Bezier *> newCurves;
+                newCurves << new Bezier;
+                newCurves.last()->addControlPoint(controlPoints.at(0)->deepCopy());
+                newCurves.last()->addControlPoint(controlPoints.at(1)->deepCopy());
+
+                for (int i = 2; i < controlPoints.size() - 2; i++)
+                {
+                    newCurves.last()->addControlPoint(controlPoints.at(i)->deepCopy());
+
+                    if (newCurves.last()->controlPoints().size() == 29)
+                    {
+                        newCurves.last()->removeControlPoint(28);
+                        i--;
+                        newCurves << new Bezier;
+                        newCurves.last()->addControlPoint(controlPoints.at(i)->deepCopy());
+                        newCurves.last()->addControlPoint(controlPoints.at(i + 1)->deepCopy());
+                    }
+                }
+
+                newCurves.last()->addControlPoint(controlPoints.at(controlPoints.size() - 2)->deepCopy());
+                newCurves.last()->addControlPoint(controlPoints.at(controlPoints.size() - 1)->deepCopy());
+
+                curves << newCurves;
+
+                delete curve;
+
+            } else
+            {
+                curves << curve;
+            }
+        }
+    }
+}
+
+Bezier *Vectorizer::constructCurve(const QVector<Point> &polyline, double tension)
+{
+    const int nPoints = polyline.size();
+
+    if (nPoints <= 1)
+    {
+        qInfo() << "Number of points in the polyline is less than 1. Number of points is" << nPoints;
+        return nullptr;
+    }
+
+    Bezier *curve = new Bezier;
+
+    Eigen::Vector2f first = polyline.at(0).toVector();
+    Eigen::Vector2f second = polyline.at(1).toVector();
+    Eigen::Vector2f secondLast = polyline.at(nPoints - 2).toVector();
+    Eigen::Vector2f last = polyline.at(nPoints - 1).toVector();
+
+    Eigen::MatrixXf derivatives(2, nPoints);
+    derivatives.col(0) = (second - first) / tension;
+    derivatives.col(nPoints - 1) = (last - secondLast) / tension;
+
+    for (int i = 1; i < polyline.size() - 1; i++)
+    {
+        Eigen::Vector2f next = polyline.at(i + 1).toVector();
+        Eigen::Vector2f prev = polyline.at(i - 1).toVector();
+
+        derivatives.col(i) = (next - prev) / tension;
+    }
+
+    Eigen::Vector2f firstDerivative = derivatives.col(0);
+    Eigen::Vector2f firstControl = first + firstDerivative / 3.0;
+
+    ControlPoint *firstHandle = polyline.at(0).toControlPoint();
+    ControlPoint *firstControlHandle = Point(firstControl(0), firstControl(1)).toControlPoint();
+
+    curve->addControlPoint(firstHandle);
+    curve->addControlPoint(firstControlHandle);
+
+    for (int i = 1; i < nPoints - 1; i++)
+    {
+        Eigen::Vector2f curr = polyline.at(i).toVector();
+        Eigen::Vector2f currDerivative = derivatives.col(i);
+
+        Eigen::Vector2f prevControl = curr - currDerivative / 3.0;
+        Eigen::Vector2f nextControl = curr + currDerivative / 3.0;
+
+        Point currHandle = polyline.at(i);
+        Point prevControlHandle(prevControl(0), prevControl(1));
+        Point nextControlHandle(nextControl(0), nextControl(1));
+
+        curve->addControlPoint(prevControlHandle.toControlPoint());
+        curve->addControlPoint(currHandle.toControlPoint());
+        curve->addControlPoint(nextControlHandle.toControlPoint());
+    }
+
+    // Correct the normal around the first handle.
+    Eigen::Vector2f lastDerivative = derivatives.col(nPoints - 1);
+    Eigen::Vector2f lastControl = last - lastDerivative / 3.0;
+
+    Point lastHandle = polyline.at(nPoints - 1);
+    Point lastControlHandle(lastControl(0), lastControl(1));
+
+    curve->addControlPoint(lastControlHandle.toControlPoint());
+    curve->addControlPoint(lastHandle.toControlPoint());
+
+    return curve;
 }

@@ -8,6 +8,8 @@ class ControlPoint
 public:
     ControlPoint();
 
+    ControlPoint *deepCopy() const;
+
 public:
     QVector2D mPosition;
     bool mSelected;

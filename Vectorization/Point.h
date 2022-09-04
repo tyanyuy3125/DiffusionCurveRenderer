@@ -2,6 +2,7 @@
 #ifndef POINT_H
 #define POINT_H
 
+#include "ControlPoint.h"
 #include <Dependencies/Eigen/Core>
 #include <functional>
 #include <iostream>
@@ -13,7 +14,8 @@ public:
     Point(double x, double y);
     double dist(Point o) const;
     double sqdist(Point o) const;
-    Eigen::Vector2f toVector();
+    Eigen::Vector2f toVector() const;
+    ControlPoint *toControlPoint() const;
     double x;
     double y;
 

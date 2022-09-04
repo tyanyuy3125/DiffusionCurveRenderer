@@ -30,7 +30,7 @@ public:
      * param maxHeight: The maximum height of the stack.
      * param sigmaStep: The increase in Gaussian filter widths between each level.
      */
-    GaussianStack(cv::Mat image, double stdDevCutoff = 40.0, int maxHeight = 20, double sigmaStep = 0.4);
+    GaussianStack(cv::Mat image, double stdDevCutoff = 40.0, int maxHeight = 40, double sigmaStep = 0.4);
 
     /*
      *  Returns the number of levels in the scale space.

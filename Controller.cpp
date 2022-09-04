@@ -39,10 +39,7 @@ Controller::Controller(QObject *parent)
     mSolidPen.setWidthF(1.0f);
     mSolidPen.setJoinStyle(Qt::MiterJoin);
 
-    mSupportedImageExtensions << "*.png"
-                              << "*.jpg"
-                              << "*.jpeg"
-                              << "*.bmp";
+    mSupportedImageExtensions << "*.png *.jpg *.jpeg *.bmp";
 }
 
 Controller::~Controller()
