@@ -5,6 +5,9 @@
 #include "EditModeCamera.h"
 #include "Manager.h"
 
+#include <QFuture>
+#include <QTimer>
+
 class CurveManager : public Manager
 {
     explicit CurveManager(QObject *parent = nullptr);
@@ -36,8 +39,6 @@ public:
 
     void deselectAllCurves();
 
-    Bezier *selectCurve(const QVector2D &position, float radius = 20.0f);
-
     ControlPoint *getClosestControlPointOnSelectedCurve(const QVector2D &nearbyPoint, float radius = 20.0f) const;
     ColorPoint *getClosestColorPointOnSelectedCurve(const QVector2D &nearbyPoint, float radius = 5.0f) const;
     BlurPoint *getClosestBlurPointOnSelectedCurve(const QVector2D &nearbyPoint, float radius = 5.0f) const;
@@ -62,13 +63,28 @@ public:
     static CurveManager *instance();
 
 private:
-    EditModeCamera *mCamera;
+    struct SelectCurveResult {
+        bool success;
+        Bezier *curve;
+    };
 
+    void selectCurve(QVector2D position, float radius = 20.0f);
+    void selectCurveAsync(QVector2D position, float radius = 20.0f);
+    void checkSelectCurveAsyncStatus();
+
+private:
+    EditModeCamera *mCamera;
     QList<Bezier *> mCurves;
     Bezier *mSelectedCurve;
     ControlPoint *mSelectedControlPoint;
     ColorPoint *mSelectedColorPoint;
     BlurPoint *mSelectedBlurPoint;
+
+    // For async curve selection
+    QTimer mTimer;                                // Check status of futures
+    QVector<QFuture<SelectCurveResult>> mFutures; // Results of futures (contains return value of selectCurve() method)
+    bool mSelectCurveAsyncRunning;
+    QVector2D mSelectCurvePosition;
 };
 
 #endif // CURVEMANAGER_H
