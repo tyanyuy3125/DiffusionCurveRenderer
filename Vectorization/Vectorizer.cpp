@@ -5,8 +5,9 @@
 
 #include <QDebug>
 
-Vectorizer::Vectorizer()
-    : mCannyUpperThreshold(200.0f)
+Vectorizer::Vectorizer(QObject *parent)
+    : QObject(parent)
+    , mCannyUpperThreshold(200.0f)
     , mCannyLowerThreshold(20.0f)
     , mGaussianStack(nullptr)
     , mEdgeStack(nullptr)
@@ -22,7 +23,7 @@ Vectorizer::Vectorizer()
     mCurveManager = CurveManager::instance();
 }
 
-void Vectorizer::load(const QString &path)
+void Vectorizer::load(QString path)
 {
     mProgress = 0.0f;
     mUpdateInitialData = false;
@@ -76,7 +77,7 @@ void Vectorizer::load(const QString &path)
     mUpdateInitialData = true;
 }
 
-void Vectorizer::drawGui()
+void Vectorizer::draw()
 {
     ImGui::Spacing();
 

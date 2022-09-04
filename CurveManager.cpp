@@ -15,8 +15,6 @@ bool CurveManager::init()
 {
     mCamera = EditModeCamera::instance(); // For fetching zoom, used for color point and blur point selection
 
-    connect(&mTimer, &QTimer::timeout, this, &CurveManager::checkSelectCurveAsyncStatus);
-
     return true;
 }
 
@@ -160,10 +158,7 @@ void CurveManager::select(const QVector2D &position, float radius)
         }
     }
 
-    if (mCurves.size() < 100)
-        selectCurve(position, radius);
-    else
-        selectCurveAsync(position, radius);
+    selectCurve(position, radius);
 }
 
 void CurveManager::addControlPoint(const QVector2D &position, bool select)
@@ -293,83 +288,6 @@ void CurveManager::removeSelectedBlurPoint()
         mSelectedCurve->removeBlurPoint(mSelectedBlurPoint);
         setSelectedBlurPoint(nullptr);
     }
-}
-
-void CurveManager::selectCurveAsync(QVector2D position, float radius)
-{
-    if (mSelectCurveAsyncRunning)
-        return;
-
-    mFutures.clear();
-    mSelectCurveAsyncRunning = true;
-    mSelectCurvePosition = position;
-
-    int numberOfRuns = 32;
-    int partitionSize = mCurves.size() / numberOfRuns;
-
-    for (int runIndex = 0; runIndex < numberOfRuns; runIndex++)
-    {
-        mFutures << QtConcurrent::run([=]() {
-            SelectCurveResult result;
-            result.success = false;
-            result.curve = nullptr;
-
-            float minDistance = std::numeric_limits<float>::infinity();
-            int start = runIndex * partitionSize;
-            int end = qMin((runIndex + 1) * partitionSize, mCurves.size());
-
-            for (int i = start; i < end; ++i)
-            {
-                float distance = mCurves[i]->distanceToPoint(position);
-                if (distance < minDistance)
-                {
-                    minDistance = distance;
-                    result.success = true;
-                    result.curve = mCurves[i];
-                }
-            }
-
-            if (minDistance < radius)
-                return result;
-
-            result.success = false;
-            result.curve = nullptr;
-
-            return result;
-        });
-    }
-
-    mTimer.start(10);
-}
-
-void CurveManager::checkSelectCurveAsyncStatus()
-{
-    for (int i = 0; i < mFutures.size(); i++)
-        if (mFutures[i].isRunning())
-            return;
-
-    float minDistance = std::numeric_limits<float>::infinity();
-    Bezier *selectedCurve = nullptr;
-
-    for (int i = 0; i < mFutures.size(); i++)
-    {
-        SelectCurveResult result = mFutures[i].result();
-
-        if (result.success)
-        {
-            float distance = result.curve->distanceToPoint(mSelectCurvePosition);
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                selectedCurve = result.curve;
-            }
-        }
-    }
-
-    mTimer.stop();
-    mSelectCurveAsyncRunning = false;
-
-    setSelectedCurve(selectedCurve);
 }
 
 ControlPoint *CurveManager::getClosestControlPointOnSelectedCurve(const QVector2D &nearbyPoint, float radius) const

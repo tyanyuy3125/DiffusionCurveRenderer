@@ -27,6 +27,7 @@ Controller::Controller(QObject *parent)
     , mSelectedControlPoint(nullptr)
     , mSelectedColorPoint(nullptr)
     , mSelectedBlurPoint(nullptr)
+    , mVectorizerImageLoaded(false)
 {
     mDashedPen.setDashPattern({8, 8});
     mDashedPen.setWidthF(1.0f);
@@ -58,7 +59,12 @@ void Controller::init()
     mCurveManager = CurveManager::instance();
     mShaderManager = ShaderManager::instance();
     mBitmapRenderer = BitmapRenderer::instance();
+
     mVectorizer = Vectorizer::instance();
+    mVectorizer->moveToThread(&mVectorizerThread);
+    connect(this, &Controller::draw, mVectorizer, &Vectorizer::draw, Qt::DirectConnection);
+    connect(this, &Controller::load, mVectorizer, &Vectorizer::load, Qt::QueuedConnection);
+    mVectorizerThread.start();
 
     mEditModeCamera = EditModeCamera::instance();
     mEditModeCamera->setPixelRatio(mWindow->devicePixelRatio());
@@ -97,6 +103,11 @@ void Controller::init()
             default:
                 break;
             }
+    });
+
+    connect(mWindow, &Window::destroyed, this, [=]() { //
+        qDebug() << Q_FUNC_INFO;
+        // TODO: Kill Vectorizer's thread
     });
 
     QVector<Bezier *> curves = Helper::loadCurveDataFromXML(":Resources/CurveData/zephyr.xml");
@@ -177,9 +188,8 @@ void Controller::onAction(Action action, CustomVariant value)
         break;
     }
     case Action::VectorizeLoadedImage: {
-        mVectorizationLoadFunctionFuture = QtConcurrent::run([=]() { //
-            mVectorizer->load(value.toString());
-        });
+        emit load(value.toString());
+        mVectorizerImageLoaded = true;
         mWorkMode = WorkMode::View;
         mSubWorkMode = SubWorkMode::ViewOriginalImage;
         break;
@@ -264,7 +274,6 @@ void Controller::render(float ifps)
     // Render
     if (mWorkMode == WorkMode::Edit)
     {
-        mCurveManager->sortCurves();
         mEditModeCamera->update(ifps);
         mRendererManager->render();
     } else if (mWorkMode == WorkMode::View)
@@ -332,7 +341,7 @@ void Controller::drawGUI()
 
     if (mWorkMode == WorkMode::View)
     {
-        mVectorizer->drawGui();
+        emit draw();
     }
 
     if (mWorkMode == WorkMode::Edit)
@@ -399,7 +408,8 @@ void Controller::drawGUI()
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "Curve");
             ImGui::Text("Number of Control Points: %d", (int) mSelectedCurve->controlPoints().size());
             ImGui::Text("Number of Color Points: %d", (int) mSelectedCurve->getAllColorPoints().size());
-            ImGui::InputInt("Depth", &mSelectedCurve->mDepth);
+            if (ImGui::InputInt("Depth", &mSelectedCurve->mDepth))
+                mCurveManager->sortCurves();
             ImGui::SliderFloat("Thickness", &mSelectedCurve->mContourThickness, 2, 50);
             ImGui::SliderFloat("Diffusion Width", &mSelectedCurve->mDiffusionWidth, 2, 50);
             ImGui::ColorEdit4("Contour Color", &mSelectedCurve->mContourColor[0]);

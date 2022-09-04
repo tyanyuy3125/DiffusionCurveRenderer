@@ -15,18 +15,22 @@
 #include <opencv2/imgproc.hpp>
 
 #include <QMap>
+#include <QObject>
 #include <QString>
+#include <QThread>
 
-class Vectorizer
+class Vectorizer : public QObject
 {
+    Q_OBJECT
 private:
-    Vectorizer();
+    explicit Vectorizer(QObject *parent = nullptr);
 
 public:
     static Vectorizer *instance();
 
-    void load(const QString &path);
-    void drawGui();
+public slots:
+    void load(QString path);
+    void draw();
 
 private:
     void clear();

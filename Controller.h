@@ -39,12 +39,20 @@ public:
     void onKeyReleased(QKeyEvent *event);
     void resize(int w, int h);
     void render(float ifps);
-    void drawGUI();
-    void drawPainter();
 
     void setWindow(Window *newWindow);
 
+signals:
+    void load(QString path);
+    void draw();
+
 private:
+    void drawGUI();
+    void drawPainter();
+
+private:
+    QThread mVectorizerThread;
+
     RendererManager *mRendererManager;
     CurveManager *mCurveManager;
     ShaderManager *mShaderManager;
@@ -90,6 +98,7 @@ private:
     Qt::MouseButton mPressedButton;
     QFileDialog *mFileDialog;
     Action mLastFileAction;
+    bool mVectorizerImageLoaded;
 
     // Aux
     Bezier *mSelectedCurve;

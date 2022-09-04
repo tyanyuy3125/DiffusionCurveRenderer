@@ -62,15 +62,7 @@ public:
 
     static CurveManager *instance();
 
-private:
-    struct SelectCurveResult {
-        bool success;
-        Bezier *curve;
-    };
-
     void selectCurve(QVector2D position, float radius = 20.0f);
-    void selectCurveAsync(QVector2D position, float radius = 20.0f);
-    void checkSelectCurveAsyncStatus();
 
 private:
     EditModeCamera *mCamera;
@@ -79,12 +71,6 @@ private:
     ControlPoint *mSelectedControlPoint;
     ColorPoint *mSelectedColorPoint;
     BlurPoint *mSelectedBlurPoint;
-
-    // For async curve selection
-    QTimer mTimer;                                // Check status of futures
-    QVector<QFuture<SelectCurveResult>> mFutures; // Results of futures (contains return value of selectCurve() method)
-    bool mSelectCurveAsyncRunning;
-    QVector2D mSelectCurvePosition;
 };
 
 #endif // CURVEMANAGER_H

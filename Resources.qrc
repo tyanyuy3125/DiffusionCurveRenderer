@@ -37,5 +37,6 @@
         <file>Resources/Shaders/LastPassBlur.vert</file>
         <file>Resources/Shaders/Bitmap.frag</file>
         <file>Resources/Shaders/Bitmap.vert</file>
+        <file>Resources/CurveData/heavy.json</file>
     </qresource>
 </RCC>

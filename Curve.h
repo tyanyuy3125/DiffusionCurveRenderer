@@ -13,12 +13,11 @@ public:
     virtual QVector2D valueAt(float t) const = 0;
     virtual QVector2D tangentAt(float t) const = 0;
     virtual QVector2D normalAt(float t) const = 0;
+
     virtual float parameterAt(const QVector2D &point, int intervals = 1000) const;
-
     virtual float length(int intervals = 100) const;
-
     virtual QRectF boundingBox(int intervals = 100) const;
-    virtual float distanceToPoint(const QVector2D &point, int intervals = 1000) const;
+    virtual float distanceToPoint(const QVector2D &point, int intervals = 100) const;
 
 private:
     static QVector2D findMeanCenter(const QVector<QVector2D> &points);
