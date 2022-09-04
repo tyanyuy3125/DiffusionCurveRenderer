@@ -2,6 +2,7 @@
 #ifndef EDGESTACK_H
 #define EDGESTACK_H
 
+#include "Common.h"
 #include "GaussianStack.h"
 
 #include <QVector>
@@ -28,7 +29,7 @@ public:
          * param lowThreshold: Low edge strength threshold for Canny edges.
          * param highThreshold: High edge strength threshold for Canny edges.
          */
-    EdgeStack(GaussianStack *stack, double lowThreshold, double highThreshold);
+    EdgeStack(ProgressStatus &progressStatus, GaussianStack *stack, double lowThreshold, double highThreshold);
 
     /*
          * Returns the number of levels in the edge stack.

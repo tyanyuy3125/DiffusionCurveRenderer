@@ -17,7 +17,7 @@ Vectorizer::Vectorizer(QObject *parent)
     , mSelectedEdgeLayer(0)
     , mInit(false)
     , mUpdateInitialData(false)
-    , mProgress(0.0f)
+
 {
     mBitmapRenderer = BitmapRenderer::instance();
     mCurveManager = CurveManager::instance();
@@ -25,7 +25,9 @@ Vectorizer::Vectorizer(QObject *parent)
 
 void Vectorizer::load(QString path)
 {
-    mProgress = 0.0f;
+    mProgressStatus.progress = 0.0f;
+    mProgressStatus.start = 0.0f;
+    mProgressStatus.end = 0.0f;
     mUpdateInitialData = false;
     clear();
 
@@ -34,26 +36,30 @@ void Vectorizer::load(QString path)
     cv::Canny(mOriginalImage, mEdgeImage, mCannyUpperThreshold, mCannyLowerThreshold);
 
     mVectorizationStatus = VectorizationStatus::CreatingGaussianStack;
-    mGaussianStack = new GaussianStack(mOriginalImage);
-    mProgress = 0.2f;
+    mProgressStatus.start = 0.0f;
+    mProgressStatus.end = 0.2f;
+    mGaussianStack = new GaussianStack(mProgressStatus, mOriginalImage);
 
     mVectorizationStatus = VectorizationStatus::CreatingEdgeStack;
-    mEdgeStack = new EdgeStack(mGaussianStack, mCannyLowerThreshold, mCannyUpperThreshold);
-    mProgress = 0.4f;
+    mProgressStatus.start = 0.2f;
+    mProgressStatus.end = 0.4f;
+    mEdgeStack = new EdgeStack(mProgressStatus, mGaussianStack, mCannyLowerThreshold, mCannyUpperThreshold);
 
     mVectorizationStatus = VectorizationStatus::TracingEdges;
-    traceEdgePixels(mChains, mEdgeStack->layer(0), 15);
-    mProgress = 0.6f;
+    mProgressStatus.start = 0.4f;
+    mProgressStatus.end = 0.6f;
+    traceEdgePixels(mProgressStatus, mChains, mEdgeStack->layer(0), 15);
 
     qInfo() << "Chains detected."
             << "Number of chains is:" << mChains.size();
 
     // Create polylines
     mVectorizationStatus = VectorizationStatus::CreatingPolylines;
-
+    mProgressStatus.start = 0.6f;
+    mProgressStatus.end = 0.8f;
     for (int i = 0; i < mChains.size(); i++)
     {
-        mProgress = 0.6f + 0.2f * float(i) / mChains.size();
+        mProgressStatus.progress = mProgressStatus.start + (mProgressStatus.end - mProgressStatus.start) * float(i) / mChains.size();
 
         PixelChain chain = mChains.at(i);
         QVector<Point> polyline;
@@ -63,14 +69,16 @@ void Vectorizer::load(QString path)
 
     // Now construct curves using polylines
     mVectorizationStatus = VectorizationStatus::ConstructingCurves;
+    mProgressStatus.start = 0.8f;
+    mProgressStatus.end = 1.0f;
     QVector<Bezier *> curves;
-    constructCurves(curves, mPolylines);
+    constructCurves(mProgressStatus, curves, mPolylines);
 
     // Set new curves
     mCurveManager->clear();
     mCurveManager->addCurves(curves);
 
-    mProgress = 1.0f;
+    mProgressStatus.progress = 1.0f;
     mSubWorkMode = SubWorkMode::ViewOriginalImage;
     mVectorizationStatus = VectorizationStatus::Finished;
     mInit = true;
@@ -84,29 +92,29 @@ void Vectorizer::draw()
     if (mVectorizationStatus == VectorizationStatus::CreatingGaussianStack)
     {
         ImGui::Text("Status: Creating Gaussian Stack...");
-        ImGui::ProgressBar(mProgress);
+        ImGui::ProgressBar(mProgressStatus.progress);
         return;
 
     } else if (mVectorizationStatus == VectorizationStatus::CreatingEdgeStack)
     {
         ImGui::Text("Status: Creating Edge Stack...");
-        ImGui::ProgressBar(mProgress);
+        ImGui::ProgressBar(mProgressStatus.progress);
         return;
 
     } else if (mVectorizationStatus == VectorizationStatus::TracingEdges)
     {
         ImGui::Text("Status: Tracing Edges...");
-        ImGui::ProgressBar(mProgress);
+        ImGui::ProgressBar(mProgressStatus.progress);
         return;
     } else if (mVectorizationStatus == VectorizationStatus::CreatingPolylines)
     {
         ImGui::Text("Status: Creating Polylines...");
-        ImGui::ProgressBar(mProgress);
+        ImGui::ProgressBar(mProgressStatus.progress);
         return;
     } else if (mVectorizationStatus == VectorizationStatus::ConstructingCurves)
     {
         ImGui::Text("Status: Constructing Curves...");
-        ImGui::ProgressBar(mProgress);
+        ImGui::ProgressBar(mProgressStatus.progress);
         return;
     }
 
@@ -197,7 +205,7 @@ void Vectorizer::clear()
  * param edges: Black-and-white image, where edges are identified by white pixels.
  * param lengthThreshold: Minimum length required for an edge to be returned.
  */
-void Vectorizer::traceEdgePixels(QVector<PixelChain> &chains, cv::Mat edges, int lengthThreshold)
+void Vectorizer::traceEdgePixels(ProgressStatus &progressStatus, QVector<PixelChain> &chains, cv::Mat edges, int lengthThreshold)
 {
     const int width = edges.cols;
     const int height = edges.rows;
@@ -214,7 +222,7 @@ void Vectorizer::traceEdgePixels(QVector<PixelChain> &chains, cv::Mat edges, int
 
     for (int i = 0; i < nEdgePixels; i++)
     {
-        mProgress = 0.4f + 0.2f * float(i) / nEdgePixels;
+        progressStatus.progress = progressStatus.start + (progressStatus.end - progressStatus.start) * float(i) / nEdgePixels;
 
         int row = nonZeros.at<cv::Point>(i).y;
         int col = nonZeros.at<cv::Point>(i).x;
@@ -506,11 +514,11 @@ void Vectorizer::findBestPath(QVector<Point> &bestPath, PixelChain chain, Eigen:
     }
 }
 
-void Vectorizer::constructCurves(QVector<Bezier *> &curves, const QVector<QVector<Point>> &polylines)
+void Vectorizer::constructCurves(ProgressStatus &progressStatus, QVector<Bezier *> &curves, const QVector<QVector<Point>> &polylines)
 {
     for (int i = 0; i < polylines.size(); i++)
     {
-        mProgress = 0.8f + 0.1f * float(i) / polylines.size();
+        progressStatus.progress = progressStatus.start + (progressStatus.end - progressStatus.start) * float(i) / polylines.size();
 
         Bezier *curve = constructCurve(polylines.at(i));
 

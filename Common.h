@@ -87,4 +87,10 @@ enum class VectorizationStatus {
 
 };
 
+struct ProgressStatus {
+    float progress; // 0,...,1
+    float start;    // 0,...,1
+    float end;
+};
+
 #endif // COMMON_H

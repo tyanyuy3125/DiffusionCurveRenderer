@@ -15,7 +15,7 @@
  * param maxHeight: The maximum height of the stack.
  * param sigmaStep: The increase in Gaussian filter widths between each level.
  */
-GaussianStack::GaussianStack(cv::Mat image, double stdDevCutoff, int maxHeight, double sigmaStep)
+GaussianStack::GaussianStack(ProgressStatus &progressStatus, cv::Mat image, double stdDevCutoff, int maxHeight, double sigmaStep)
 {
     this->levels.clear();
 
@@ -43,6 +43,9 @@ GaussianStack::GaussianStack(cv::Mat image, double stdDevCutoff, int maxHeight, 
         this->levels.push_back(blurred);
 
         remainingHeight -= 1;
+
+        progressStatus.progress = progressStatus.start + (progressStatus.end - progressStatus.start) * float(maxHeight - remainingHeight) / float(maxHeight);
+
     } while (remainingHeight != 0);
 }
 

@@ -34,10 +34,10 @@ public slots:
 
 private:
     void clear();
-    void traceEdgePixels(QVector<PixelChain> &chains, cv::Mat edges, int lengthThreshold);
+    void traceEdgePixels(ProgressStatus &progressStatus, QVector<PixelChain> &chains, cv::Mat edges, int lengthThreshold);
     void potrace(QVector<Point> &polyline, PixelChain chain);
     void findBestPath(QVector<Point> &bestPath, PixelChain chain, Eigen::MatrixXd penalties);
-    void constructCurves(QVector<Bezier *> &curves, const QVector<QVector<Point>> &polylines);
+    void constructCurves(ProgressStatus &progressStatus, QVector<Bezier *> &curves, const QVector<QVector<Point>> &polylines);
     Bezier *constructCurve(const QVector<Point> &polyline, double tension = 2.0);
 
 private:
@@ -63,7 +63,7 @@ private:
     int mSelectedEdgeLayer;
     bool mInit;
     bool mUpdateInitialData;
-    float mProgress;
+    ProgressStatus mProgressStatus;
 };
 
 #endif // VECTORIZER_H

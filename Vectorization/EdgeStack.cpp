@@ -15,7 +15,7 @@
  * param lowThreshold: Low edge strength threshold for Canny edges.
  * param highThreshold: High edge strength threshold for Canny edges.
  */
-EdgeStack::EdgeStack(GaussianStack *stack, double lowThreshold, double highThreshold)
+EdgeStack::EdgeStack(ProgressStatus &progressStatus, GaussianStack *stack, double lowThreshold, double highThreshold)
 {
     int stackHeight = stack->height();
 
@@ -24,6 +24,8 @@ EdgeStack::EdgeStack(GaussianStack *stack, double lowThreshold, double highThres
 
     for (int layer = 0; layer < stackHeight && nonzeros > 0; layer++)
     {
+        progressStatus.progress = progressStatus.start + (progressStatus.end - progressStatus.start) * float(layer) / float(stackHeight);
+
         cv::Mat image = stack->layer(layer);
 
         cv::Mat edges;
