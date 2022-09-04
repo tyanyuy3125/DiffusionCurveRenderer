@@ -23,11 +23,12 @@ Controller::Controller(QObject *parent)
     , mGlobalBlurStrength(DEFAULT_BLUR_STRENGTH)
     , mSmoothIterations(20)
     , mQualityFactor(1)
+    , mVectorizerImageLoaded(false)
+    , mShowFileDailog(false)
     , mSelectedCurve(nullptr)
     , mSelectedControlPoint(nullptr)
     , mSelectedColorPoint(nullptr)
     , mSelectedBlurPoint(nullptr)
-    , mVectorizerImageLoaded(false)
 {
     mDashedPen.setDashPattern({8, 8});
     mDashedPen.setWidthF(1.0f);
@@ -39,14 +40,11 @@ Controller::Controller(QObject *parent)
 
     mSolidPen.setWidthF(1.0f);
     mSolidPen.setJoinStyle(Qt::MiterJoin);
-
-    mSupportedImageExtensions << "*.png *.jpg *.jpeg *.bmp";
 }
 
 Controller::~Controller()
 {
     qDebug() << Q_FUNC_INFO;
-    mVectorizationLoadFunctionFuture.cancel();
 }
 
 void Controller::init()
@@ -80,34 +78,8 @@ void Controller::init()
     for (auto manager : mManagers)
         manager->init();
 
-    mFileDialog = new QFileDialog;
-    connect(mFileDialog, &QFileDialog::fileSelected, this, [=](const QString &path) {
-        if (!path.isEmpty())
-            switch (mLastFileAction)
-            {
-            case Action::ShowLoadFromXMLDialog:
-                onAction(Action::LoadFromXML, path);
-                break;
-            case Action::ShowLoadFromJSONDialog:
-                onAction(Action::LoadFromJSON, path);
-                break;
-            case Action::ShowSaveAsJSONDialog:
-                onAction(Action::SaveAsJSON, path);
-                break;
-            case Action::ShowSaveAsPNGDialog:
-                onAction(Action::SaveAsPNG, path);
-                break;
-            case Action::ShowLoadImageDialog:
-                onAction(Action::VectorizeLoadedImage, path);
-                break;
-            default:
-                break;
-            }
-    });
-
     connect(mWindow, &Window::destroyed, this, [=]() { //
-        qDebug() << Q_FUNC_INFO;
-        // TODO: Kill Vectorizer's thread
+        mVectorizerThread.terminate();
     });
 
     QVector<Bezier *> curves = Helper::loadCurveDataFromXML(":Resources/CurveData/zephyr.xml");
@@ -187,7 +159,7 @@ void Controller::onAction(Action action, CustomVariant value)
         }
         break;
     }
-    case Action::VectorizeLoadedImage: {
+    case Action::LoadVectorizerImage: {
         emit load(value.toString());
         mVectorizerImageLoaded = true;
         mWorkMode = WorkMode::View;
@@ -199,40 +171,24 @@ void Controller::onAction(Action action, CustomVariant value)
         break;
     }
     case Action::ShowLoadFromJSONDialog:
-        mLastFileAction = Action::ShowLoadFromJSONDialog;
-        mFileDialog->setFileMode(QFileDialog::ExistingFile);
-        mFileDialog->setAcceptMode(QFileDialog::AcceptOpen);
-        mFileDialog->setNameFilter("*.json");
-        mFileDialog->show();
+        mFileDailogType = FileDialogType::LoadFromJSON;
+        mShowFileDailog = true;
         break;
     case Action::ShowSaveAsJSONDialog:
-        mLastFileAction = Action::ShowSaveAsJSONDialog;
-        mFileDialog->setFileMode(QFileDialog::AnyFile);
-        mFileDialog->setAcceptMode(QFileDialog::AcceptSave);
-        mFileDialog->setDefaultSuffix(".json");
-        mFileDialog->setNameFilter("*.json");
-        mFileDialog->show();
+        mFileDailogType = FileDialogType::SaveAsJSON;
+        mShowFileDailog = true;
         break;
     case Action::ShowLoadFromXMLDialog:
-        mLastFileAction = Action::ShowLoadFromXMLDialog;
-        mFileDialog->setFileMode(QFileDialog::ExistingFile);
-        mFileDialog->setAcceptMode(QFileDialog::AcceptOpen);
-        mFileDialog->setNameFilter("*.xml");
-        mFileDialog->show();
+        mFileDailogType = FileDialogType::LoadFromXML;
+        mShowFileDailog = true;
         break;
     case Action::ShowSaveAsPNGDialog:
-        mLastFileAction = Action::ShowSaveAsPNGDialog;
-        mFileDialog->setFileMode(QFileDialog::AnyFile);
-        mFileDialog->setAcceptMode(QFileDialog::AcceptSave);
-        mFileDialog->setDefaultSuffix(".png");
-        mFileDialog->setNameFilter("*.png");
-        mFileDialog->show();
+        mFileDailogType = FileDialogType::SaveAsPNG;
+        mShowFileDailog = true;
+        break;
     case Action::ShowLoadImageDialog:
-        mLastFileAction = Action::ShowLoadImageDialog;
-        mFileDialog->setFileMode(QFileDialog::ExistingFile);
-        mFileDialog->setAcceptMode(QFileDialog::AcceptOpen);
-        mFileDialog->setNameFilters(mSupportedImageExtensions);
-        mFileDialog->show();
+        mFileDailogType = FileDialogType::LoadVectorizerImage;
+        mShowFileDailog = true;
         break;
     }
 }
@@ -291,6 +247,49 @@ void Controller::render(float ifps)
     // ImGui Stuff
     mImGuiWantsMouseCapture = ImGui::GetIO().WantCaptureMouse;
     mImGuiWantsKeyboardCapture = ImGui::GetIO().WantCaptureKeyboard;
+
+    // We must show file dialog in the render loop; otherwise the app crashes.
+    if (mShowFileDailog)
+    {
+        mShowFileDailog = false;
+        switch (mFileDailogType)
+        {
+        case FileDialogType::LoadFromXML: {
+            QString path = QFileDialog::getOpenFileName(nullptr, "Select a XML file", QString(), "*.xml");
+            if (!path.isNull())
+                onAction(Action::LoadFromXML, path);
+            break;
+        }
+        case FileDialogType::LoadFromJSON: {
+            QString path = QFileDialog::getOpenFileName(nullptr, "Select a JSON file", QString(), "*.json");
+            if (!path.isNull())
+                onAction(Action::LoadFromJSON, path);
+
+            break;
+        }
+        case FileDialogType::SaveAsPNG: {
+            QString path = QFileDialog::getSaveFileName(nullptr, "Save as PNG", "", "*.png");
+            if (!path.isNull())
+                onAction(Action::SaveAsPNG, path);
+
+            break;
+        }
+        case FileDialogType::SaveAsJSON: {
+            QString path = QFileDialog::getSaveFileName(nullptr, "Save as JSON", "", "*.json");
+            if (!path.isNull())
+                onAction(Action::SaveAsJSON, path);
+
+            break;
+        }
+        case FileDialogType::LoadVectorizerImage: {
+            QString path = QFileDialog::getOpenFileName(nullptr, "Select an Image", "", "*.png *.jpg *.jpeg *.bmp");
+            if (!path.isNull())
+                onAction(Action::LoadVectorizerImage, path);
+
+            break;
+        }
+        }
+    }
 }
 
 void Controller::drawGUI()

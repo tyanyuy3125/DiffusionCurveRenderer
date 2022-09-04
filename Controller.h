@@ -50,6 +50,14 @@ private:
     void drawGUI();
     void drawPainter();
 
+    enum class FileDialogType { //
+        LoadFromXML,
+        LoadFromJSON,
+        SaveAsPNG,
+        SaveAsJSON,
+        LoadVectorizerImage,
+    };
+
 private:
     QThread mVectorizerThread;
 
@@ -86,19 +94,15 @@ private:
     int mSmoothIterations;
     int mQualityFactor;
 
-    QStringList mSupportedImageExtensions;
-
-    QFuture<void> mVectorizationLoadFunctionFuture;
-
     // GUI
     QPen mDashedPen;
     QPen mSolidPen;
     QPen mDenseDashedPen;
     QPointF mPreviousMousePosition;
     Qt::MouseButton mPressedButton;
-    QFileDialog *mFileDialog;
-    Action mLastFileAction;
     bool mVectorizerImageLoaded;
+    bool mShowFileDailog;
+    FileDialogType mFileDailogType;
 
     // Aux
     Bezier *mSelectedCurve;

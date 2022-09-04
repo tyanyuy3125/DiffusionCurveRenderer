@@ -66,7 +66,7 @@ enum class Action { //
     LoadFromJSON,
     SaveAsPNG,
     SaveAsJSON,
-    VectorizeLoadedImage,
+    LoadVectorizerImage,
     ShowLoadFromXMLDialog,
     ShowLoadFromJSONDialog,
     ShowSaveAsPNGDialog,
