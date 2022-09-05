@@ -13,6 +13,7 @@ class CurveManager : public Manager
     explicit CurveManager(QObject *parent = nullptr);
 
 public:
+    static CurveManager *instance();
     bool init() override;
 
     // Actions
@@ -60,8 +61,9 @@ public:
     void sortCurves();
     void clear();
 
-    static CurveManager *instance();
+    void makeVoid(float threshold);
 
+private:
     void selectCurve(QVector2D position, float radius = 20.0f);
 
 private:

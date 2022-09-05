@@ -77,6 +77,7 @@ public:
     float mDiffusionWidth;
     bool mSelected;
     int mDepth;
+    bool mVoid;
 
 private:
     QList<ControlPoint *> mControlPoints;

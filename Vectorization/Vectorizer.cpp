@@ -34,6 +34,8 @@ void Vectorizer::load(QString path)
     if (mEdgeStack)
         delete mEdgeStack;
 
+    mSelectedGaussianLayer = 0;
+    mSelectedEdgeLayer = 0;
     mProgressStatus.progress = 0.0f;
 
     mOriginalImage = cv::imread(path.toStdString(), cv::IMREAD_COLOR);
@@ -67,7 +69,7 @@ void Vectorizer::onVectorize()
     mVectorizationStatus = VectorizationStatus::TracingEdges;
     mProgressStatus.start = 0.0f;
     mProgressStatus.end = 0.45f;
-    traceEdgePixels(mProgressStatus, mChains, mEdgeStack->layer(mSelectedEdgeLayer), 5);
+    traceEdgePixels(mProgressStatus, mChains, mEdgeStack->layer(mSelectedEdgeLayer), 10);
 
     qInfo() << "Chains detected."
             << "Number of chains is:" << mChains.size();
@@ -149,16 +151,16 @@ void Vectorizer::draw()
 
     int mode = (int) mSubWorkMode;
 
-    if (ImGui::RadioButton("View Original Image", &mode, 0))
+    if (ImGui::RadioButton("View Original Image##SubWorkMode", &mode, 0))
         mBitmapRenderer->setData(mOriginalImage, GL_BGR);
 
-    if (ImGui::RadioButton("View Edges", &mode, 1))
+    if (ImGui::RadioButton("View Edges##SubWorkMode", &mode, 1))
         mBitmapRenderer->setData(mEdgeImage, GL_RED);
 
-    if (ImGui::RadioButton("View Gaussian Stack", &mode, 2))
+    if (ImGui::RadioButton("View Gaussian Stack##SubWorkMode", &mode, 2))
         mBitmapRenderer->setData(mGaussianStack->layer(mSelectedGaussianLayer), GL_BGR);
 
-    if (ImGui::RadioButton("Choose Edge Stack Level", &mode, 3))
+    if (ImGui::RadioButton("Choose Edge Stack Level##SubWorkMode", &mode, 3))
         mBitmapRenderer->setData(mEdgeStack->layer(mSelectedEdgeLayer), GL_RED);
 
     if (mSubWorkMode == SubWorkMode::ViewGaussianStack)
@@ -176,7 +178,7 @@ void Vectorizer::draw()
         if (ImGui::SliderInt("Layer##Edge", &mSelectedEdgeLayer, 0, mEdgeStack->height() - 1))
             mBitmapRenderer->setData(mEdgeStack->layer(mSelectedEdgeLayer), GL_RED);
 
-        if (ImGui::Button("Vectorize"))
+        if (ImGui::Button("Vectorize##Button"))
             emit vectorize();
     }
 
@@ -626,3 +628,5 @@ Bezier *Vectorizer::constructCurve(const QVector<Point> &polyline, double tensio
 
     return curve;
 }
+
+void Vectorizer::sampleColors(Bezier *curve, cv::Mat &image, cv::Mat &imageLab, double sampleDensity) {}

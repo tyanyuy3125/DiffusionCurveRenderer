@@ -162,6 +162,12 @@ void RendererManager::renderContours(QOpenGLFramebufferObject *target, bool clea
 
     for (const auto &curve : mCurves)
     {
+        if (curve == nullptr)
+            continue;
+
+        if (curve->mVoid)
+            continue;
+
         QVector<QVector2D> controlPoints = curve->getControlPointPositions();
 
         mShaderManager->setUniformValue("color", curve->mContourColor);
@@ -350,6 +356,9 @@ void RendererManager::renderColors(QOpenGLFramebufferObject *draw)
     for (auto &curve : mCurves)
     {
         if (curve == nullptr)
+            continue;
+
+        if (curve->mVoid)
             continue;
 
         curve->scale(mQualityFactor);

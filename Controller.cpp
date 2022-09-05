@@ -23,6 +23,7 @@ Controller::Controller(QObject *parent)
     , mGlobalBlurStrength(DEFAULT_BLUR_STRENGTH)
     , mSmoothIterations(20)
     , mQualityFactor(1)
+    , mVoidThreshold(0.0f)
     , mVectorizerImageLoaded(false)
     , mShowFileDailog(false)
     , mSelectedCurve(nullptr)
@@ -45,7 +46,6 @@ Controller::Controller(QObject *parent)
 Controller::~Controller()
 {
     qDebug() << Q_FUNC_INFO;
-    mVectorizerThread.terminate();
 }
 
 void Controller::init()
@@ -81,7 +81,8 @@ void Controller::init()
 
     connect(mWindow, &Window::destroyed, this, [=]() { //
         qDebug() << Q_FUNC_INFO;
-        mVectorizerThread.terminate();
+        if (mVectorizerThread.isRunning())
+            mVectorizerThread.quit();
     });
 
     QVector<Bezier *> curves = Helper::loadCurveDataFromXML(":Resources/CurveData/zephyr.xml");
@@ -164,7 +165,7 @@ void Controller::onAction(Action action, CustomVariant value)
     case Action::LoadVectorizerImage: {
         emit load(value.toString());
         mVectorizerImageLoaded = true;
-        mWorkMode = WorkMode::View;
+        mWorkMode = WorkMode::Vectorization;
         mSubWorkMode = SubWorkMode::ViewOriginalImage;
         break;
     }
@@ -234,7 +235,7 @@ void Controller::render(float ifps)
     {
         mEditModeCamera->update(ifps);
         mRendererManager->render();
-    } else if (mWorkMode == WorkMode::View)
+    } else if (mWorkMode == WorkMode::Vectorization)
     {
         mViewModeCamera->update(ifps);
         mBitmapRenderer->render();
@@ -334,13 +335,13 @@ void Controller::drawGUI()
 
         int mode = (int) mWorkMode;
         ImGui::BeginDisabled(!mVectorizerImageLoaded);
-        ImGui::RadioButton("View", &mode, 0);
+        ImGui::RadioButton("Vectorize##WorkMode", &mode, 0);
         ImGui::EndDisabled();
-        ImGui::RadioButton("Edit", &mode, 1);
+        ImGui::RadioButton("Edit##WorkMode", &mode, 1);
         mWorkMode = WorkMode(mode);
     }
 
-    if (mWorkMode == WorkMode::View)
+    if (mWorkMode == WorkMode::Vectorization)
     {
         emit draw();
     }
@@ -352,11 +353,11 @@ void Controller::drawGUI()
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "Actions Modes");
 
             int mode = (int) mActionMode;
-            ImGui::RadioButton("Select", &mode, 0);
-            ImGui::RadioButton("Add Control Point (Ctrl)", &mode, 1);
+            ImGui::RadioButton("Select##ActionMode", &mode, 0);
+            ImGui::RadioButton("Add Control Point (Ctrl)##ActionMode", &mode, 1);
             ImGui::BeginDisabled(!mSelectedCurve);
-            ImGui::RadioButton("Add Color Point (Alt)", &mode, 2);
-            ImGui::RadioButton("Add Blur Point", &mode, 3);
+            ImGui::RadioButton("Add Color Point (Alt)##ActionMode", &mode, 2);
+            ImGui::RadioButton("Add Blur Point##ActionMode", &mode, 3);
             ImGui::EndDisabled();
             mActionMode = ActionMode(mode);
         }
@@ -399,6 +400,9 @@ void Controller::drawGUI()
 
             if (ImGui::ColorEdit4("Global Contour Color", &mGlobalContourColor[0]))
                 mCurveManager->setGlobalContourColor(mGlobalContourColor);
+
+            if (ImGui::SliderFloat("Void Threshold", &mVoidThreshold, 0.0f, 32.0f))
+                mCurveManager->makeVoid(mVoidThreshold);
         }
 
         ImGui::Spacing();
@@ -581,7 +585,7 @@ void Controller::onWheelMoved(QWheelEvent *event)
 {
     if (mWorkMode == WorkMode::Edit)
         mEditModeCamera->onWheelMoved(event);
-    else if (mWorkMode == WorkMode::View)
+    else if (mWorkMode == WorkMode::Vectorization)
         mViewModeCamera->onWheelMoved(event);
 }
 
@@ -601,7 +605,7 @@ void Controller::onMousePressed(QMouseEvent *event)
     {
         if (mWorkMode == WorkMode::Edit)
             mEditModeCamera->onMousePressed(event);
-        else if (mWorkMode == WorkMode::View)
+        else if (mWorkMode == WorkMode::Vectorization)
             mViewModeCamera->onMousePressed(event);
     }
 }
@@ -636,7 +640,7 @@ void Controller::onMouseMoved(QMouseEvent *event)
 
     if (mWorkMode == WorkMode::Edit)
         mEditModeCamera->onMouseMoved(event);
-    else if (mWorkMode == WorkMode::View)
+    else if (mWorkMode == WorkMode::Vectorization)
         mViewModeCamera->onMouseMoved(event);
 }
 

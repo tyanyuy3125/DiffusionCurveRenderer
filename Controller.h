@@ -94,6 +94,8 @@ private:
     int mSmoothIterations;
     int mQualityFactor;
 
+    float mVoidThreshold;
+
     // GUI
     QPen mDashedPen;
     QPen mSolidPen;

@@ -66,7 +66,7 @@ enum class Action { //
 
 // Vectorizer
 enum class WorkMode { //
-    View,
+    Vectorization,
     Edit,
 };
 

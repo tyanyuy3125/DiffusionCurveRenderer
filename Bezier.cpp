@@ -7,6 +7,7 @@ Bezier::Bezier()
     , mDiffusionWidth(DEFAULT_DIFFUSION_WIDTH)
     , mSelected(false)
     , mDepth(0)
+    , mVoid(false)
 {}
 
 Bezier::~Bezier()

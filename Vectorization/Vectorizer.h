@@ -41,6 +41,7 @@ private:
     void findBestPath(QVector<Point> &bestPath, PixelChain chain, Eigen::MatrixXd penalties);
     void constructCurves(ProgressStatus &progressStatus, QVector<Bezier *> &curves, const QVector<QVector<Point>> &polylines);
     Bezier *constructCurve(const QVector<Point> &polyline, double tension = 2.0);
+    void sampleColors(Bezier *curve, cv::Mat &image, cv::Mat &imageLab, double sampleDensity);
 
 signals:
     void vectorize();
@@ -56,6 +57,7 @@ private:
     cv::Mat mOriginalImage;
     cv::Mat mBlurredImage;
     cv::Mat mEdgeImage;
+    cv::Mat mLabImage;
 
     GaussianStack *mGaussianStack;
     EdgeStack *mEdgeStack;

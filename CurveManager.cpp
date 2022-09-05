@@ -356,6 +356,9 @@ void CurveManager::selectCurve(QVector2D position, float radius)
 
     for (int i = 0; i < mCurves.size(); ++i)
     {
+        if (mCurves[i]->mVoid)
+            continue;
+
         float distance = mCurves[i]->distanceToPoint(position);
         if (distance < minDistance)
         {
@@ -491,4 +494,17 @@ void CurveManager::clear()
     setSelectedControlPoint(nullptr);
     setSelectedCurve(nullptr);
     mCurves.clear();
+}
+
+void CurveManager::makeVoid(float threshold)
+{
+    for (int i = 0; i < mCurves.size(); i++)
+    {
+        float length = mCurves[i]->length();
+
+        if (length < threshold)
+            mCurves[i]->mVoid = true;
+        else
+            mCurves[i]->mVoid = false;
+    }
 }
