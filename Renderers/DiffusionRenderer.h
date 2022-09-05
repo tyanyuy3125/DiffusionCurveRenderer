@@ -14,9 +14,9 @@ public:
     void resize(int w, int h) override;
     void setQualityFactor(float newQualityFactor) override;
     void setPixelRatio(float newPixelRatio) override;
+    void setSmoothIterations(int newSmoothIterations);
 
     void render(QOpenGLFramebufferObject *initialFramebuffer, QOpenGLFramebufferObject *target, bool clearTarget = true);
-    void setSmoothIterations(int newSmoothIterations);
 
 private:
     void downsample(QOpenGLFramebufferObject *draw, QOpenGLFramebufferObject *read);

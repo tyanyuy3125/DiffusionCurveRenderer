@@ -24,12 +24,12 @@ SOURCES += \
     Helper.cpp \
     Main.cpp \
     Manager.cpp \
-    Points.cpp \
-    Quad.cpp \
     Renderers/BitmapRenderer.cpp \
     Renderers/ColorRenderer.cpp \
     Renderers/ContourRenderer.cpp \
     Renderers/DiffusionRenderer.cpp \
+    Renderers/Points.cpp \
+    Renderers/Quad.cpp \
     Renderers/RendererBase.cpp \
     Renderers/RendererManager.cpp \
     Shader.cpp \
@@ -56,12 +56,12 @@ HEADERS += \
     Framebuffer.h \
     Helper.h \
     Manager.h \
-    Points.h \
-    Quad.h \
     Renderers/BitmapRenderer.h \
     Renderers/ColorRenderer.h \
     Renderers/ContourRenderer.h \
     Renderers/DiffusionRenderer.h \
+    Renderers/Points.h \
+    Renderers/Quad.h \
     Renderers/RendererBase.h \
     Renderers/RendererManager.h \
     Shader.h \

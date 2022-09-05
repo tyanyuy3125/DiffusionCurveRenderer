@@ -56,7 +56,6 @@ private:
 
     RenderMode mRenderMode;
     int mSmoothIterations;
-
     float mQualityFactor;
     int mWidth;
     int mHeight;

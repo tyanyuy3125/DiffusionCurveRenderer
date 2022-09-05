@@ -205,7 +205,6 @@ void Controller::render(float ifps)
     mSelectedControlPoint = mCurveManager->selectedControlPoint();
     mSelectedColorPoint = mCurveManager->selectedColorPoint();
     mSelectedBlurPoint = mCurveManager->selectedBlurPoint();
-
     mPixelRatio = mWindow->devicePixelRatio();
 
     // Update member classes
@@ -344,9 +343,7 @@ void Controller::drawGUI()
     if (mWorkMode == WorkMode::Vectorization)
     {
         emit draw();
-    }
-
-    if (mWorkMode == WorkMode::Edit)
+    } else if (mWorkMode == WorkMode::Edit)
     {
         // Action Modes
         {

@@ -107,34 +107,6 @@ void DiffusionRenderer::render(QOpenGLFramebufferObject *initialFramebuffer, QOp
     }
 }
 
-void DiffusionRenderer::resize(int w, int h)
-{
-    RendererBase::resize(w, h);
-    deleteFramebuffers();
-    createFramebuffers();
-}
-
-void DiffusionRenderer::setQualityFactor(float newQualityFactor)
-{
-    if (qFuzzyCompare(mQualityFactor, newQualityFactor))
-        return;
-
-    mQualityFactor = newQualityFactor;
-    deleteFramebuffers();
-    createFramebuffers();
-}
-
-void DiffusionRenderer::setPixelRatio(float newPixelRatio)
-{
-    if (qFuzzyCompare(mPixelRatio, newPixelRatio))
-        return;
-
-    mPixelRatio = newPixelRatio;
-
-    deleteFramebuffers();
-    createFramebuffers();
-}
-
 void DiffusionRenderer::downsample(QOpenGLFramebufferObject *draw, QOpenGLFramebufferObject *read)
 {
     draw->bind();
@@ -282,6 +254,36 @@ void DiffusionRenderer::createFramebuffers()
 
         size /= 2;
     }
+}
+
+void DiffusionRenderer::resize(int w, int h)
+{
+    RendererBase::resize(w, h);
+
+    deleteFramebuffers();
+    createFramebuffers();
+}
+
+void DiffusionRenderer::setQualityFactor(float newQualityFactor)
+{
+    if (qFuzzyCompare(mQualityFactor, newQualityFactor))
+        return;
+
+    mQualityFactor = newQualityFactor;
+
+    deleteFramebuffers();
+    createFramebuffers();
+}
+
+void DiffusionRenderer::setPixelRatio(float newPixelRatio)
+{
+    if (qFuzzyCompare(mPixelRatio, newPixelRatio))
+        return;
+
+    mPixelRatio = newPixelRatio;
+
+    deleteFramebuffers();
+    createFramebuffers();
 }
 
 void DiffusionRenderer::setSmoothIterations(int newSmoothIterations)
