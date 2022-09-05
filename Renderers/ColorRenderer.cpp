@@ -41,6 +41,7 @@ void ColorRenderer::render(QOpenGLFramebufferObject *draw)
         auto blurPointStrengths = curve->getBlurPointStrengths();
 
         mShaderManager->setUniformValue("diffusionWidth", mQualityFactor * curve->mDiffusionWidth);
+        mShaderManager->setUniformValue("diffusionGap", mQualityFactor * curve->mDiffusionGap);
         mShaderManager->setUniformValueArray("controlPoints", controlPoints);
         mShaderManager->setUniformValue("controlPointsCount", (int) controlPoints.size());
         mShaderManager->setUniformValueArray("leftColors", leftColors);

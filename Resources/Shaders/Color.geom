@@ -6,6 +6,7 @@ layout(triangle_strip, max_vertices = 8) out;
 uniform mat4 projection;
 uniform float pointsDelta;
 uniform float diffusionWidth;
+uniform float diffusionGap;
 uniform float zoom;
 uniform vec2 controlPoints[32];
 uniform int controlPointsCount;
@@ -161,28 +162,29 @@ void main()
     float deltaBlue1 = abs(l1.b - r1.b);
 
     float width = diffusionWidth * min(zoom, 1.0f);
+    float gap = diffusionGap * min(zoom, 1.0f);
 
     vec4 b0 = vec4(blurAt(t0) * max(deltaRed0, max(deltaGreen0, deltaBlue0)), 1);
     vec4 b1 = vec4(blurAt(t1) * max(deltaRed1, max(deltaGreen1, deltaBlue1)), 1);
 
     // Left side
     {
-        gl_Position = projection * vec4(v0 - 0.5f * width * n0, 0, 1);
+        gl_Position = projection * vec4(v0 - 0.5f * gap * n0, 0, 1);
         fsColor = l0;
         fsBlur = b0;
         EmitVertex();
 
-        gl_Position = projection * vec4(v0 - 1.0f * width * n0, 0, 1);
+        gl_Position = projection * vec4(v0 - 0.5f * gap * n0 - 1.0f * width * n0, 0, 1);
         fsColor = l0;
         fsBlur = b0;
         EmitVertex();
 
-        gl_Position = projection * vec4(v1 - 0.5f * width * n1, 0, 1);
+        gl_Position = projection * vec4(v1 - 0.5f * gap * n1, 0, 1);
         fsColor = l1;
         fsBlur = b1;
         EmitVertex();
 
-        gl_Position = projection * vec4(v1 - 1.0f * width * n1, 0, 1);
+        gl_Position = projection * vec4(v1 - 0.5f * gap * n1 - 1.0f * width * n1, 0, 1);
         fsColor = l1;
         fsBlur = b1;
         EmitVertex();
@@ -192,22 +194,22 @@ void main()
 
     // Right side
     {
-        gl_Position = projection * vec4(v0 + 0.5f * width * n0, 0, 1);
+        gl_Position = projection * vec4(v0 + 0.5f * gap * n0, 0, 1);
         fsColor = r0;
         fsBlur = b0;
         EmitVertex();
 
-        gl_Position = projection * vec4(v0 + 1.0f * width * n0, 0, 1);
+        gl_Position = projection * vec4(v0 + 0.5f * gap * n0 + 1.0f * width * n0, 0, 1);
         fsColor = r0;
         fsBlur = b0;
         EmitVertex();
 
-        gl_Position = projection * vec4(v1 + 0.5f * width * n1, 0, 1);
+        gl_Position = projection * vec4(v1 + 0.5f * gap * n1, 0, 1);
         fsColor = r1;
         fsBlur = b1;
         EmitVertex();
 
-        gl_Position = projection * vec4(v1 + 1.0f * width * n1, 0, 1);
+        gl_Position = projection * vec4(v1 + 0.5f * gap * n1 + 1.0f * width * n1, 0, 1);
         fsColor = r1;
         fsBlur = b1;
         EmitVertex();

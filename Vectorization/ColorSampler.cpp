@@ -20,20 +20,19 @@ void ColorSampler::run(const QVector<Bezier *> &curves, cv::Mat &image, cv::Mat 
         sampleAlongNormal(curve, 0.0f, ColorPoint::Direction::Left, image, imageLab);
         sampleAlongNormal(curve, 0.0f, ColorPoint::Direction::Right, image, imageLab);
 
-        sampleAlongNormal(curve, 0.25, ColorPoint::Direction::Left, image, imageLab);
-        sampleAlongNormal(curve, 0.25, ColorPoint::Direction::Right, image, imageLab);
-
         sampleAlongNormal(curve, 0.5, ColorPoint::Direction::Left, image, imageLab);
         sampleAlongNormal(curve, 0.5, ColorPoint::Direction::Right, image, imageLab);
 
-        sampleAlongNormal(curve, 0.75, ColorPoint::Direction::Left, image, imageLab);
-        sampleAlongNormal(curve, 0.75, ColorPoint::Direction::Right, image, imageLab);
-
-        sampleAlongNormal(curve, 0.86, ColorPoint::Direction::Left, image, imageLab);
-        sampleAlongNormal(curve, 0.86, ColorPoint::Direction::Right, image, imageLab);
-
         sampleAlongNormal(curve, 1.0f, ColorPoint::Direction::Left, image, imageLab);
         sampleAlongNormal(curve, 1.0f, ColorPoint::Direction::Right, image, imageLab);
+
+        int nSamples = sampleDensity * curve->length();
+
+        for (int i = 0; i < nSamples - 3; i++)
+        {
+            sampleAlongNormal(curve, mRandomGenerator.bounded(1.0f), ColorPoint::Direction::Left, image, imageLab);
+            sampleAlongNormal(curve, mRandomGenerator.bounded(1.0f), ColorPoint::Direction::Right, image, imageLab);
+        }
     }
 }
 
@@ -75,73 +74,6 @@ void ColorSampler::sampleAlongNormal(Bezier *curve, float parameter, ColorPoint:
         return;
     }
 
-    // Extract an image patch, at most 3 pixels across, around the sample point.
-    const int startX = sample.x() == 0 ? 0 : sample.x() - 1;
-    const int endX = sample.x() == width - 1 ? width - 1 : sample.x() + 1;
-    const int startY = sample.y() == 0 ? 0 : sample.y() - 1;
-    const int endY = sample.y() == height - 1 ? height - 1 : sample.y() + 1;
-
-    const int patchWidth = endX - startX + 1;
-    const int patchHeight = endY - startY + 1;
-
-    // Compute the mean of each of the LAB channels in the patch.
-    double luminanceMean = 0.0;
-    double alphaMean = 0.0;
-    double betaMean = 0.0;
-
-    for (int dx = 0; dx < patchWidth; dx++)
-    {
-        for (int dy = 0; dy < patchHeight; dy++)
-        {
-            cv::Vec3b pixel = imageLab.at<cv::Vec3b>(startY + dy, startX + dx);
-
-            luminanceMean += pixel(0);
-            alphaMean += pixel(1);
-            betaMean += pixel(2);
-        }
-    }
-
-    luminanceMean /= (patchWidth * patchHeight);
-    alphaMean /= (patchWidth * patchHeight);
-    betaMean /= (patchWidth * patchHeight);
-
-    // Compute the variance and standard deviation of LAB channels in the patch.
-    double luminanceVariance = 0.0;
-    double alphaVariance = 0.0;
-    double betaVariance = 0.0;
-
-    for (int dx = 0; dx < patchWidth; dx++)
-    {
-        for (int dy = 0; dy < patchHeight; dy++)
-        {
-            cv::Vec3b pixel = imageLab.at<cv::Vec3b>(startY + dy, startX + dx);
-
-            luminanceVariance += pow(pixel(0) - luminanceMean, 2.0);
-            alphaVariance += pow(pixel(1) - alphaMean, 2.0);
-            betaVariance += pow(pixel(2) - betaMean, 2.0);
-        }
-    }
-
-    luminanceVariance /= (patchWidth * patchHeight);
-    alphaVariance /= (patchWidth * patchHeight);
-    betaVariance /= (patchWidth * patchHeight);
-
-    const double luminanceStdDev = std::sqrt(luminanceVariance);
-    const double alphaStdDev = std::sqrt(alphaVariance);
-    const double betaStdDev = std::sqrt(betaVariance);
-
-    // Take the sample point's value in each of the LAB channels.
-    cv::Vec3b sampleColour = imageLab.at<cv::Vec3b>(sample.y(), sample.x());
-    const double luminance = sampleColour(0);
-    const double alpha = sampleColour(1);
-    const double beta = sampleColour(2);
-
-    // Check that the sample point is within one standard deviation of the
-    // mean for all three channels.
-    const double luminanceDiff = std::abs(luminance - luminanceMean);
-    const double alphaDiff = std::abs(alpha - alphaMean);
-    const double betaDiff = std::abs(beta - betaMean);
-
     auto color = &image.at<cv::Vec3b>(sample.y(), sample.x());
 
     if (color != NULL)
@@ -154,27 +86,4 @@ void ColorSampler::sampleAlongNormal(Bezier *curve, float parameter, ColorPoint:
         point->setParent(curve);
         curve->addColorPoint(point);
     }
-
-    //    if (luminanceDiff > luminanceStdDev || alphaDiff > alphaStdDev || betaDiff > betaStdDev)
-    //    {
-    //        // Return null to signify that no colour could be sampled here.
-    //        return;
-
-    //    } else
-    //    {
-    //        // Return the BGR colour at the sample point.
-    //        auto color = &image.at<cv::Vec3b>(sample.y(), sample.x());
-
-    //        if (color != NULL)
-    //        {
-    //            // Colour sample is valid.
-    //            ColorPoint *point = new ColorPoint;
-    //            point->mColor = QVector4D(int(color->val[2]) / 255.0f, int(color->val[1]) / 255.0f, int(color->val[0]) / 255.0f, 1.0);
-    //            qDebug() << point->mColor;
-    //            point->mDirection = direction;
-    //            point->mPosition = parameter;
-    //            point->setParent(curve);
-    //            curve->addColorPoint(point);
-    //        }
-    //    }
 }

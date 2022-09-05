@@ -88,6 +88,7 @@ private:
 
     float mGlobalContourThickness;
     float mGlobalDiffusionWidth;
+    float mGlobalDiffusionGap;
     QVector4D mGlobalContourColor;
     float mGlobalBlurStrength;
 

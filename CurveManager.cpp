@@ -72,6 +72,12 @@ void CurveManager::setGlobalDiffusionWidth(float width)
         curve->mDiffusionWidth = width;
 }
 
+void CurveManager::setGlobalDiffusionGap(float gap)
+{
+    for (auto &curve : mCurves)
+        curve->mDiffusionGap = gap;
+}
+
 void CurveManager::setGlobalBlurStrength(float strength)
 {
     for (auto &curve : mCurves)

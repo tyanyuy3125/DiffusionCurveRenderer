@@ -75,6 +75,7 @@ public:
     QVector4D mContourColor;
     float mContourThickness;
     float mDiffusionWidth;
+    float mDiffusionGap;
     bool mSelected;
     int mDepth;
     bool mVoid;

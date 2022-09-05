@@ -19,6 +19,7 @@ Controller::Controller(QObject *parent)
     , mRenderMode(RenderMode::Contour)
     , mGlobalContourThickness(DEFAULT_CONTOUR_THICKNESS)
     , mGlobalDiffusionWidth(DEFAULT_DIFFUSION_WIDTH)
+    , mGlobalDiffusionGap(DEFAULT_DIFFUSION_GAP)
     , mGlobalContourColor(DEFAULT_CONTOUR_COLOR)
     , mGlobalBlurStrength(DEFAULT_BLUR_STRENGTH)
     , mSmoothIterations(20)
@@ -389,11 +390,14 @@ void Controller::drawGUI()
             if (ImGui::SliderFloat("Global Blur Strength", &mGlobalBlurStrength, 0.0f, 1.0f))
                 mCurveManager->setGlobalBlurStrength(mGlobalBlurStrength);
 
-            if (ImGui::SliderFloat("Global Thickness", &mGlobalContourThickness, 2, 10))
+            if (ImGui::SliderFloat("Global Thickness", &mGlobalContourThickness, 1, 20))
                 mCurveManager->setGlobalContourThickness(mGlobalContourThickness);
 
-            if (ImGui::SliderFloat("Global Diffusion Width", &mGlobalDiffusionWidth, 2, 40))
+            if (ImGui::SliderFloat("Global Diffusion Width", &mGlobalDiffusionWidth, 1, 20))
                 mCurveManager->setGlobalDiffusionWidth(mGlobalDiffusionWidth);
+
+            if (ImGui::SliderFloat("Global Diffusion Gap", &mGlobalDiffusionGap, 0, 20))
+                mCurveManager->setGlobalDiffusionGap(mGlobalDiffusionGap);
 
             if (ImGui::ColorEdit4("Global Contour Color", &mGlobalContourColor[0]))
                 mCurveManager->setGlobalContourColor(mGlobalContourColor);
@@ -412,8 +416,9 @@ void Controller::drawGUI()
             ImGui::Text("Number of Color Points: %d", (int) mSelectedCurve->getAllColorPoints().size());
             if (ImGui::InputInt("Depth", &mSelectedCurve->mDepth))
                 mCurveManager->sortCurves();
-            ImGui::SliderFloat("Thickness", &mSelectedCurve->mContourThickness, 2, 50);
-            ImGui::SliderFloat("Diffusion Width", &mSelectedCurve->mDiffusionWidth, 2, 50);
+            ImGui::SliderFloat("Thickness", &mSelectedCurve->mContourThickness, 1, 20);
+            ImGui::SliderFloat("Diffusion Width", &mSelectedCurve->mDiffusionWidth, 1, 20);
+            ImGui::SliderFloat("Diffusion Gap", &mSelectedCurve->mDiffusionGap, 0, 20);
             ImGui::ColorEdit4("Contour Color", &mSelectedCurve->mContourColor[0]);
             if (ImGui::Button("Remove Curve"))
                 onAction(Action::RemoveCurve);

@@ -36,6 +36,7 @@ public:
     void setGlobalContourThickness(float thickness);
     void setGlobalContourColor(const QVector4D &color);
     void setGlobalDiffusionWidth(float width);
+    void setGlobalDiffusionGap(float gap);
     void setGlobalBlurStrength(float strength);
 
     void deselectAllCurves();

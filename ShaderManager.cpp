@@ -37,6 +37,7 @@ bool ShaderManager::init()
         shader->addUniform("projection");
         shader->addUniform("pointsDelta");
         shader->addUniform("diffusionWidth");
+        shader->addUniform("diffusionGap");
         shader->addUniform("zoom");
         shader->addUniform("controlPoints");
         shader->addUniform("controlPointsCount");
