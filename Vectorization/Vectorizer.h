@@ -1,6 +1,7 @@
 #ifndef VECTORIZER_H
 #define VECTORIZER_H
 
+#include "ColorSampler.h"
 #include "CurveManager.h"
 #include "EdgeStack.h"
 #include "EdgeTracer.h"
@@ -49,6 +50,7 @@ private:
     EdgeTracer *mEdgeTracer;
     Potrace *mPotrace;
     CurveConstructor *mCurveConstructor;
+    ColorSampler *mColorSampler;
 
     float mCannyUpperThreshold;
     float mCannyLowerThreshold;

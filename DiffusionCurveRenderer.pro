@@ -34,6 +34,7 @@ SOURCES += \
     Renderers/RendererManager.cpp \
     Shader.cpp \
     ShaderManager.cpp \
+    Vectorization/ColorSampler.cpp \
     Vectorization/CurveConstructor.cpp \
     Vectorization/EdgeStack.cpp \
     Vectorization/EdgeTracer.cpp \
@@ -69,6 +70,7 @@ HEADERS += \
     Renderers/RendererManager.h \
     Shader.h \
     ShaderManager.h \
+    Vectorization/ColorSampler.h \
     Vectorization/CurveConstructor.h \
     Vectorization/EdgeStack.h \
     Vectorization/EdgeTracer.h \

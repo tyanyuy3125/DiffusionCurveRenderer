@@ -2,10 +2,10 @@
 #include "Bezier.h"
 
 ColorPoint::ColorPoint()
-    : mParent(nullptr)
-    , mColor(1, 1, 1, 1)
+    : mColor(1, 1, 1, 1)
     , mPosition(0)
     , mSelected(false)
+    , mParent(nullptr)
 {}
 
 QVector2D ColorPoint::getPosition2D(float gap) const

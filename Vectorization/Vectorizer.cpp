@@ -12,6 +12,7 @@ Vectorizer::Vectorizer(QObject *parent)
     , mEdgeTracer(nullptr)
     , mPotrace(nullptr)
     , mCurveConstructor(nullptr)
+    , mColorSampler(nullptr)
     , mCannyUpperThreshold(200.0f)
     , mCannyLowerThreshold(20.0f)
     , mSubWorkMode(SubWorkMode::ViewOriginalImage)
@@ -46,6 +47,9 @@ void Vectorizer::load(QString path)
     if (mCurveConstructor)
         delete mCurveConstructor;
 
+    if (mColorSampler)
+        delete mColorSampler;
+
     mSelectedGaussianLayer = 0;
     mSelectedEdgeLayer = 0;
 
@@ -61,7 +65,7 @@ void Vectorizer::load(QString path)
     mEdgeStack = new EdgeStack;
     mEdgeStack->run(mGaussianStack, mCannyLowerThreshold, mCannyUpperThreshold);
 
-    mSubWorkMode = SubWorkMode::ViewOriginalImage;
+    mSubWorkMode = SubWorkMode::ChooseEdgeStackLevel;
     mVectorizationStatus = VectorizationStatus::Ready;
     mInit = true;
     mUpdateInitialData = true;
@@ -69,6 +73,7 @@ void Vectorizer::load(QString path)
 
 void Vectorizer::onVectorize()
 {
+    // Tracing edges
     mVectorizationStatus = VectorizationStatus::TracingEdges;
     mEdgeTracer = new EdgeTracer;
     mEdgeTracer->run(mEdgeStack->layer(mSelectedEdgeLayer), 10);
@@ -85,6 +90,12 @@ void Vectorizer::onVectorize()
     mVectorizationStatus = VectorizationStatus::ConstructingCurves;
     mCurveConstructor = new CurveConstructor;
     mCurveConstructor->run(mPotrace->polylines());
+
+    // Sampling Colors
+    mColorSampler = new ColorSampler;
+    cv::Mat imageLAB;
+    cv::cvtColor(mOriginalImage, imageLAB, cv::COLOR_BGR2Lab);
+    mColorSampler->run(mCurveConstructor->curves(), mOriginalImage, imageLAB, 0.1);
 
     // Set new curves
     mCurveManager->clear();
@@ -155,7 +166,7 @@ void Vectorizer::draw()
 
     if (mUpdateInitialData)
     {
-        mBitmapRenderer->setData(mOriginalImage, GL_BGR);
+        mBitmapRenderer->setData(mEdgeStack->layer(mSelectedEdgeLayer), GL_RED);
         mUpdateInitialData = false;
     }
 

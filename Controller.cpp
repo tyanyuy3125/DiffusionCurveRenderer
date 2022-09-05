@@ -392,7 +392,7 @@ void Controller::drawGUI()
             if (ImGui::SliderFloat("Global Thickness", &mGlobalContourThickness, 2, 10))
                 mCurveManager->setGlobalContourThickness(mGlobalContourThickness);
 
-            if (ImGui::SliderFloat("Global Diffusion Width", &mGlobalDiffusionWidth, 2, 10))
+            if (ImGui::SliderFloat("Global Diffusion Width", &mGlobalDiffusionWidth, 2, 40))
                 mCurveManager->setGlobalDiffusionWidth(mGlobalDiffusionWidth);
 
             if (ImGui::ColorEdit4("Global Contour Color", &mGlobalContourColor[0]))
