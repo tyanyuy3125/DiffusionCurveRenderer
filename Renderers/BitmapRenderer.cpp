@@ -1,5 +1,7 @@
 #include "BitmapRenderer.h"
 
+#include <opencv2/core/mat.hpp>
+
 BitmapRenderer::BitmapRenderer(QObject *parent)
     : Manager(parent)
     , mTexture(0)

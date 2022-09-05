@@ -2,7 +2,6 @@
 #ifndef GAUSSIANSTACK_H
 #define GAUSSIANSTACK_H
 
-#include "Common.h"
 #include <QVector>
 
 #include <opencv2/core/mat.hpp>
@@ -14,9 +13,13 @@ private:
     /*
      * A vector of increasingly Gaussian-blurred images.
      */
-    QVector<cv::Mat> levels;
+    QVector<cv::Mat> mLevels;
+
+    float mProgress;
 
 public:
+    GaussianStack();
+
     /**
      * Construct a Gaussian scale space representing the image passed in.
      *
@@ -31,7 +34,7 @@ public:
      * param maxHeight: The maximum height of the stack.
      * param sigmaStep: The increase in Gaussian filter widths between each level.
      */
-    GaussianStack(ProgressStatus &progressStatus, cv::Mat image, double stdDevCutoff = 40.0, int maxHeight = 60, double sigmaStep = 0.4);
+    void run(cv::Mat image, double stdDevCutoff = 40.0, int maxHeight = 60, double sigmaStep = 0.4);
 
     /*
      *  Returns the number of levels in the scale space.
@@ -48,6 +51,8 @@ public:
      *  Returns the blurred RGB image at the <layer>'th layer.
      */
     cv::Mat layer(int layer);
+
+    float progress() const;
 };
 
 #endif // GAUSSIANSTACK_H

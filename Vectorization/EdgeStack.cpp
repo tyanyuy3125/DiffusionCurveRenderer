@@ -4,6 +4,10 @@
 
 #include "opencv2/imgproc/imgproc.hpp"
 
+EdgeStack::EdgeStack()
+    : mProgress(0.0f)
+{}
+
 /**
  * Creates a stack of edge images from a Gaussian scale space.
  *
@@ -15,7 +19,7 @@
  * param lowThreshold: Low edge strength threshold for Canny edges.
  * param highThreshold: High edge strength threshold for Canny edges.
  */
-EdgeStack::EdgeStack(ProgressStatus &progressStatus, GaussianStack *stack, double lowThreshold, double highThreshold)
+void EdgeStack::run(GaussianStack *stack, double lowThreshold, double highThreshold)
 {
     int stackHeight = stack->height();
 
@@ -24,14 +28,14 @@ EdgeStack::EdgeStack(ProgressStatus &progressStatus, GaussianStack *stack, doubl
 
     for (int layer = 0; layer < stackHeight && nonzeros > 0; layer++)
     {
-        progressStatus.progress = progressStatus.start + (progressStatus.end - progressStatus.start) * float(layer) / float(stackHeight);
+        this->mProgress = float(layer) / float(stackHeight - 1);
 
         cv::Mat image = stack->layer(layer);
 
         cv::Mat edges;
         cv::Canny(image, edges, lowThreshold, highThreshold);
 
-        this->levels.push_back(edges);
+        this->mLevels.push_back(edges);
 
         nonzeros = cv::countNonZero(edges);
     }
@@ -39,7 +43,7 @@ EdgeStack::EdgeStack(ProgressStatus &progressStatus, GaussianStack *stack, doubl
     if (nonzeros == 0)
     {
         // Remove the top level if it had no detectable edge pixels.
-        this->levels.pop_back();
+        this->mLevels.pop_back();
     }
 
     // Trim any blurred images from the Gaussian stack beyond the point
@@ -56,7 +60,7 @@ EdgeStack::EdgeStack(ProgressStatus &progressStatus, GaussianStack *stack, doubl
  */
 int EdgeStack::height()
 {
-    return this->levels.size();
+    return this->mLevels.size();
 }
 
 /*
@@ -64,5 +68,10 @@ int EdgeStack::height()
  */
 cv::Mat EdgeStack::layer(int layer)
 {
-    return this->levels.at(layer);
+    return this->mLevels.at(layer);
+}
+
+float EdgeStack::progress() const
+{
+    return this->mProgress;
 }

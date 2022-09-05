@@ -34,10 +34,13 @@ SOURCES += \
     Renderers/RendererManager.cpp \
     Shader.cpp \
     ShaderManager.cpp \
+    Vectorization/CurveConstructor.cpp \
     Vectorization/EdgeStack.cpp \
+    Vectorization/EdgeTracer.cpp \
     Vectorization/GaussianStack.cpp \
     Vectorization/PixelChain.cpp \
     Vectorization/Point.cpp \
+    Vectorization/Potrace.cpp \
     Vectorization/Vectorizer.cpp \
     ViewModeCamera.cpp \
     Window.cpp
@@ -66,10 +69,13 @@ HEADERS += \
     Renderers/RendererManager.h \
     Shader.h \
     ShaderManager.h \
+    Vectorization/CurveConstructor.h \
     Vectorization/EdgeStack.h \
+    Vectorization/EdgeTracer.h \
     Vectorization/GaussianStack.h \
     Vectorization/PixelChain.h \
     Vectorization/Point.h \
+    Vectorization/Potrace.h \
     Vectorization/Vectorizer.h \
     ViewModeCamera.h \
     Window.h

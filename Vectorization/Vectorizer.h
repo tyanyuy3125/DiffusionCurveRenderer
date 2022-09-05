@@ -1,12 +1,13 @@
 #ifndef VECTORIZER_H
 #define VECTORIZER_H
 
-#include "Bezier.h"
 #include "CurveManager.h"
 #include "EdgeStack.h"
+#include "EdgeTracer.h"
 #include "GaussianStack.h"
-#include "PixelChain.h"
+#include "Potrace.h"
 #include "Renderers/BitmapRenderer.h"
+#include "Vectorization/CurveConstructor.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/core/mat.hpp>
@@ -36,16 +37,6 @@ private:
     void onVectorize();
     void updateEdges();
 
-    void traceEdgePixels(ProgressStatus &progressStatus, QVector<PixelChain> &chains, cv::Mat edges, int lengthThreshold);
-    void potrace(QVector<Point> &polyline, PixelChain chain);
-    void findBestPath(QVector<Point> &bestPath, PixelChain chain, Eigen::MatrixXd penalties);
-
-    void constructCurves(ProgressStatus &progressStatus, QVector<Bezier *> &curves, const QVector<QVector<Point>> &polylines);
-    Bezier *constructCurve(const QVector<Point> &polyline, double tension = 2.0);
-
-    void sampleColors(ProgressStatus &progressStatus, QVector<Bezier *> &curves, cv::Mat &image, cv::Mat &imageLab, double sampleDensity);
-    cv::Vec3b *sampleAlongNormal(cv::Mat &image, cv::Mat &imageLab, QVector2D point, QVector2D normal, double distance);
-
 signals:
     void vectorize();
 
@@ -53,20 +44,18 @@ private:
     BitmapRenderer *mBitmapRenderer;
     CurveManager *mCurveManager;
 
+    GaussianStack *mGaussianStack;
+    EdgeStack *mEdgeStack;
+    EdgeTracer *mEdgeTracer;
+    Potrace *mPotrace;
+    CurveConstructor *mCurveConstructor;
+
     float mCannyUpperThreshold;
     float mCannyLowerThreshold;
 
-    // Updated when an image is loaded
     cv::Mat mOriginalImage;
-    cv::Mat mBlurredImage;
     cv::Mat mEdgeImage;
     cv::Mat mLabImage;
-
-    GaussianStack *mGaussianStack;
-    EdgeStack *mEdgeStack;
-    QList<PixelChain> mChains;
-
-    QList<QVector<Point>> mPolylines;
 
     SubWorkMode mSubWorkMode;
     VectorizationStatus mVectorizationStatus;
@@ -76,7 +65,6 @@ private:
     int mSelectedEdgeLayer;
     bool mInit;
     bool mUpdateInitialData;
-    ProgressStatus mProgressStatus;
 };
 
 #endif // VECTORIZER_H

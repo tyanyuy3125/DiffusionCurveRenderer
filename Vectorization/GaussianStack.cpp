@@ -1,6 +1,10 @@
 // This code taken from https://github.com/zhuethanca/DiffusionCurves and adopted.
 #include "GaussianStack.h"
 
+GaussianStack::GaussianStack()
+    : mProgress(0.0f)
+{}
+
 /**
  * Construct a Gaussian scale space representing the image passed in.
  *
@@ -15,9 +19,9 @@
  * param maxHeight: The maximum height of the stack.
  * param sigmaStep: The increase in Gaussian filter widths between each level.
  */
-GaussianStack::GaussianStack(ProgressStatus &progressStatus, cv::Mat image, double stdDevCutoff, int maxHeight, double sigmaStep)
+void GaussianStack::run(cv::Mat image, double stdDevCutoff, int maxHeight, double sigmaStep)
 {
-    this->levels.clear();
+    this->mLevels.clear();
 
     double sigma = 0.4;
     //    double stdDev;
@@ -26,6 +30,8 @@ GaussianStack::GaussianStack(ProgressStatus &progressStatus, cv::Mat image, doub
 
     do
     {
+        this->mProgress = float(maxHeight - remainingHeight) / float(maxHeight);
+
         // Define parameters for the next level of Gaussian filter.
         const int radius = std::ceil(2 * sigma);
         const int width = 2 * radius + 1;
@@ -40,11 +46,9 @@ GaussianStack::GaussianStack(ProgressStatus &progressStatus, cv::Mat image, doub
 
         sigma += 0.4;
 
-        this->levels.push_back(blurred);
+        this->mLevels.push_back(blurred);
 
         remainingHeight -= 1;
-
-        progressStatus.progress = progressStatus.start + (progressStatus.end - progressStatus.start) * float(maxHeight - remainingHeight) / float(maxHeight);
 
     } while (remainingHeight != 0);
 }
@@ -54,7 +58,7 @@ GaussianStack::GaussianStack(ProgressStatus &progressStatus, cv::Mat image, doub
  */
 int GaussianStack::height()
 {
-    return this->levels.size();
+    return this->mLevels.size();
 }
 
 /*
@@ -63,7 +67,7 @@ int GaussianStack::height()
  */
 void GaussianStack::restrict(int layers)
 {
-    this->levels.resize(layers);
+    this->mLevels.resize(layers);
 }
 
 /*
@@ -71,5 +75,10 @@ void GaussianStack::restrict(int layers)
  */
 cv::Mat GaussianStack::layer(int layer)
 {
-    return this->levels.at(layer);
+    return this->mLevels.at(layer);
+}
+
+float GaussianStack::progress() const
+{
+    return this->mProgress;
 }
