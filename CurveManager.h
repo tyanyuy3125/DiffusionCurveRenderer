@@ -17,7 +17,7 @@ public:
     bool init() override;
 
     // Actions
-    void select(const QVector2D &position, float radius = 5.0f);
+    void select(RenderMode renderMode, const QVector2D &position, float radius = 5.0f);
     void addControlPoint(const QVector2D &position, bool select = true);
     void addColorPoint(const QVector2D &position, bool select = true);
     void addBlurPoint(const QVector2D &position, bool select = true);

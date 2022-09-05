@@ -2,7 +2,7 @@
 #define CURVECONSTRUCTOR_H
 
 #include "Bezier.h"
-#include "Vectorization/Potrace.h"
+#include "Point.h"
 
 class CurveConstructor
 {

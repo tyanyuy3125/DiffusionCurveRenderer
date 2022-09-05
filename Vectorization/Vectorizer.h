@@ -40,6 +40,7 @@ private:
 
 signals:
     void vectorize();
+    void vectorizationDone();
 
 private:
     BitmapRenderer *mBitmapRenderer;

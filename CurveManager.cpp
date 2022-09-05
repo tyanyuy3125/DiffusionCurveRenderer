@@ -99,72 +99,101 @@ void CurveManager::deselectAllCurves()
     mSelectedCurve = nullptr;
 }
 
-void CurveManager::select(const QVector2D &position, float radius)
+void CurveManager::select(RenderMode renderMode, const QVector2D &position, float radius)
 {
-    if (mSelectedCurve)
+    if (renderMode == RenderMode::Contour)
     {
-        ControlPoint *controlPoint = getClosestControlPointOnSelectedCurve(position, radius);
-        ColorPoint *colorPoint = getClosestColorPointOnSelectedCurve(position, radius);
-        BlurPoint *blurPoint = getClosestBlurPointOnSelectedCurve(position, radius);
-
-        if (controlPoint && colorPoint && blurPoint)
+        if (mSelectedCurve)
         {
-            float distanceToControlPoint = position.distanceToPoint(controlPoint->mPosition);
-            float distanceToColorPoint = position.distanceToPoint(colorPoint->getPosition2D(mCamera->zoom() * COLOR_POINT_VISUAL_GAP));
-            float distanceToBlurPoint = position.distanceToPoint(blurPoint->getPosition2D(mCamera->zoom() * BLUR_POINT_VISUAL_GAP));
+            ControlPoint *controlPoint = getClosestControlPointOnSelectedCurve(position, radius);
 
-            float min = qMin(distanceToControlPoint, qMin(distanceToColorPoint, distanceToBlurPoint));
-
-            if (qFuzzyCompare(min, distanceToControlPoint))
+            if (controlPoint)
             {
                 setSelectedControlPoint(controlPoint);
                 setSelectedColorPoint(nullptr);
                 setSelectedBlurPoint(nullptr);
+                return;
+            } else
+            {
+                setSelectedControlPoint(nullptr);
+                setSelectedColorPoint(nullptr);
+                setSelectedBlurPoint(nullptr);
             }
+        }
 
-            else if (qFuzzyCompare(min, distanceToColorPoint))
+        selectCurve(position, radius);
+
+    } else
+    {
+        if (mSelectedCurve)
+        {
+            ControlPoint *controlPoint = getClosestControlPointOnSelectedCurve(position, radius);
+            ColorPoint *colorPoint = getClosestColorPointOnSelectedCurve(position, radius);
+            BlurPoint *blurPoint = getClosestBlurPointOnSelectedCurve(position, radius);
+
+            if (controlPoint && colorPoint && blurPoint)
+            {
+                float distanceToControlPoint = position.distanceToPoint(controlPoint->mPosition);
+                float distanceToColorPoint = position.distanceToPoint(colorPoint->getPosition2D(mCamera->zoom() * COLOR_POINT_VISUAL_GAP));
+                float distanceToBlurPoint = position.distanceToPoint(blurPoint->getPosition2D(mCamera->zoom() * BLUR_POINT_VISUAL_GAP));
+
+                float min = qMin(distanceToControlPoint, qMin(distanceToColorPoint, distanceToBlurPoint));
+
+                if (qFuzzyCompare(min, distanceToControlPoint))
+                {
+                    setSelectedControlPoint(controlPoint);
+                    setSelectedColorPoint(nullptr);
+                    setSelectedBlurPoint(nullptr);
+                }
+
+                else if (qFuzzyCompare(min, distanceToColorPoint))
+                {
+                    setSelectedColorPoint(colorPoint);
+                    setSelectedControlPoint(nullptr);
+                    setSelectedBlurPoint(nullptr);
+                }
+
+                else if (qFuzzyCompare(min, distanceToBlurPoint))
+                {
+                    setSelectedBlurPoint(blurPoint);
+                    setSelectedControlPoint(nullptr);
+                    setSelectedColorPoint(nullptr);
+                }
+
+                return;
+
+            } else if (controlPoint)
+            {
+                setSelectedControlPoint(controlPoint);
+                setSelectedColorPoint(nullptr);
+                setSelectedBlurPoint(nullptr);
+                return;
+
+            } else if (colorPoint)
             {
                 setSelectedColorPoint(colorPoint);
                 setSelectedControlPoint(nullptr);
                 setSelectedBlurPoint(nullptr);
-            }
+                return;
 
-            else if (qFuzzyCompare(min, distanceToBlurPoint))
+            } else if (blurPoint)
             {
                 setSelectedBlurPoint(blurPoint);
                 setSelectedControlPoint(nullptr);
                 setSelectedColorPoint(nullptr);
+
+                return;
+
+            } else
+            {
+                setSelectedControlPoint(nullptr);
+                setSelectedColorPoint(nullptr);
+                setSelectedBlurPoint(nullptr);
             }
-
-            return;
-        } else if (controlPoint)
-        {
-            setSelectedControlPoint(controlPoint);
-            setSelectedColorPoint(nullptr);
-            setSelectedBlurPoint(nullptr);
-            return;
-        } else if (colorPoint)
-        {
-            setSelectedColorPoint(colorPoint);
-            setSelectedControlPoint(nullptr);
-            setSelectedBlurPoint(nullptr);
-            return;
-        } else if (blurPoint)
-        {
-            setSelectedBlurPoint(blurPoint);
-            setSelectedControlPoint(nullptr);
-            setSelectedColorPoint(nullptr);
-
-            return;
-        } else
-        {
-            setSelectedControlPoint(nullptr);
-            setSelectedColorPoint(nullptr);
-            setSelectedBlurPoint(nullptr);
         }
-    }
 
-    selectCurve(position, radius);
+        selectCurve(position, radius);
+    }
 }
 
 void CurveManager::addControlPoint(const QVector2D &position, bool select)

@@ -101,9 +101,10 @@ void Vectorizer::onVectorize()
     mCurveManager->clear();
     mCurveManager->addCurves(mCurveConstructor->curves());
 
-    mSubWorkMode = SubWorkMode::ViewOriginalImage;
     mVectorizationStatus = VectorizationStatus::Finished;
     mUpdateInitialData = true;
+
+    emit vectorizationDone();
 }
 
 void Vectorizer::draw()

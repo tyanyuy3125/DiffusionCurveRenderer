@@ -52,8 +52,6 @@ Controller::~Controller()
 void Controller::init()
 {
     initializeOpenGLFunctions();
-    //    glEnable(GL_BLEND);
-    //    glBlendFunc(GL_ONE, GL_ZERO);
 
     mRendererManager = RendererManager::instance();
     mCurveManager = CurveManager::instance();
@@ -64,6 +62,12 @@ void Controller::init()
     mVectorizer->moveToThread(&mVectorizerThread);
     connect(this, &Controller::draw, mVectorizer, &Vectorizer::draw, Qt::DirectConnection);
     connect(this, &Controller::load, mVectorizer, &Vectorizer::load, Qt::QueuedConnection);
+    connect(mVectorizer, &Vectorizer::vectorizationDone, this, [=]() { //
+        mWorkMode = WorkMode::Edit;
+        mActionMode = ActionMode::Select;
+        mRenderMode = RenderMode::Contour;
+    });
+
     mVectorizerThread.start();
 
     mEditModeCamera = EditModeCamera::instance();
@@ -86,12 +90,12 @@ void Controller::init()
             mVectorizerThread.quit();
     });
 
-    QVector<Bezier *> curves = Helper::loadCurveDataFromXML(":Resources/CurveData/zephyr.xml");
-    if (!curves.isEmpty())
-    {
-        mCurveManager->clear();
-        mCurveManager->addCurves(curves);
-    }
+    // QVector<Bezier *> curves = Helper::loadCurveDataFromXML(":Resources/CurveData/zephyr.xml");
+    //    if (!curves.isEmpty())
+    //    {
+    //        mCurveManager->clear();
+    //        mCurveManager->addCurves(curves);
+    //    }
 }
 
 void Controller::onAction(Action action, CustomVariant value)
@@ -99,7 +103,7 @@ void Controller::onAction(Action action, CustomVariant value)
     switch (action)
     {
     case Action::Select: {
-        mCurveManager->select(value.toVector2D(), mEditModeCamera->zoom() * 15.0f);
+        mCurveManager->select(mRenderMode, value.toVector2D(), mEditModeCamera->zoom() * 15.0f);
         break;
     }
     case Action::AddControlPoint: {
@@ -370,7 +374,11 @@ void Controller::drawGUI()
             bool b2 = mRenderMode == RenderMode::ContourAndDiffusion;
 
             if (ImGui::Checkbox("Contours", &b0))
+            {
                 mRenderMode = RenderMode::Contour;
+                mCurveManager->setSelectedBlurPoint(nullptr);
+                mCurveManager->setSelectedColorPoint(nullptr);
+            }
 
             if (ImGui::Checkbox("Diffusion", &b1))
                 mRenderMode = RenderMode::Diffusion;
@@ -501,32 +509,6 @@ void Controller::drawPainter()
             painter.drawLine(p0, p1);
         }
 
-        // Blur Points
-
-        for (int i = 0; i < mBlurPoints.size(); ++i)
-        {
-            QPointF visualPosition = mEditModeCamera->toGUI(mBlurPoints[i]->getPosition2D(mEditModeCamera->zoom() * BLUR_POINT_VISUAL_GAP));
-            QPointF actualPosition = mEditModeCamera->toGUI(mSelectedCurve->valueAt(mBlurPoints[i]->mPosition));
-
-            // Draw a dashed line actual position to visual position
-            painter.setPen(mDenseDashedPen);
-            painter.drawLine(actualPosition, visualPosition);
-
-            // Outer disk
-            float outerRadius = mBlurPoints[i]->mSelected ? 36 : 24;
-            outerRadius = qMin(outerRadius, outerRadius / mEditModeCamera->zoom());
-            painter.setBrush(QColor(128, 128, 128, 128));
-            painter.setPen(QColor(0, 0, 0, 0));
-            painter.drawEllipse(visualPosition, outerRadius, outerRadius);
-
-            // Inner disk
-            float innerRadius = 8;
-            innerRadius = qMin(innerRadius, innerRadius / mEditModeCamera->zoom());
-            painter.setBrush(QColor(255, 255, 255));
-            painter.setPen(QColor(0, 0, 0, 0));
-            painter.drawEllipse(visualPosition, innerRadius, innerRadius);
-        }
-
         // Control Points
 
         for (int j = 0; j < mControlPoints.size(); ++j)
@@ -548,32 +530,60 @@ void Controller::drawPainter()
             painter.drawEllipse(center, innerRadius, innerRadius);
         }
 
-        // Color Points
-        for (int i = 0; i < mColorPoints.size(); ++i)
+        if (mRenderMode != RenderMode::Contour)
         {
-            QPointF visualPosition = mEditModeCamera->toGUI(mColorPoints[i]->getPosition2D(mEditModeCamera->zoom() * COLOR_POINT_VISUAL_GAP));
-            QPointF actualPosition = mEditModeCamera->toGUI(mSelectedCurve->valueAt(mColorPoints[i]->mPosition));
+            // Blur Points
+            for (int i = 0; i < mBlurPoints.size(); ++i)
+            {
+                QPointF visualPosition = mEditModeCamera->toGUI(mBlurPoints[i]->getPosition2D(mEditModeCamera->zoom() * BLUR_POINT_VISUAL_GAP));
+                QPointF actualPosition = mEditModeCamera->toGUI(mSelectedCurve->valueAt(mBlurPoints[i]->mPosition));
 
-            // Draw a dashed line actual position to visual position
-            painter.setPen(mDenseDashedPen);
-            painter.drawLine(actualPosition, visualPosition);
+                // Draw a dashed line actual position to visual position
+                painter.setPen(mDenseDashedPen);
+                painter.drawLine(actualPosition, visualPosition);
 
-            // Outer disk
-            float outerRadius = mColorPoints[i]->mSelected ? 16 : 12;
-            outerRadius = qMin(outerRadius, outerRadius / mEditModeCamera->zoom());
-            painter.setBrush(QColor(128, 128, 128, 128));
-            painter.setPen(QColor(0, 0, 0, 0));
-            painter.drawEllipse(visualPosition, outerRadius, outerRadius);
+                // Outer disk
+                float outerRadius = mBlurPoints[i]->mSelected ? 36 : 24;
+                outerRadius = qMin(outerRadius, outerRadius / mEditModeCamera->zoom());
+                painter.setBrush(QColor(128, 128, 128, 128));
+                painter.setPen(QColor(0, 0, 0, 0));
+                painter.drawEllipse(visualPosition, outerRadius, outerRadius);
 
-            // Inner disk
-            float innerRadius = 6;
-            innerRadius = qMin(innerRadius, innerRadius / mEditModeCamera->zoom());
-            painter.setBrush(QColor(255 * mColorPoints[i]->mColor.x(), //
-                                    255 * mColorPoints[i]->mColor.y(),
-                                    255 * mColorPoints[i]->mColor.z(),
-                                    255 * mColorPoints[i]->mColor.w()));
-            painter.setPen(QColor(0, 0, 0, 0));
-            painter.drawEllipse(visualPosition, innerRadius, innerRadius);
+                // Inner disk
+                float innerRadius = 8;
+                innerRadius = qMin(innerRadius, innerRadius / mEditModeCamera->zoom());
+                painter.setBrush(QColor(255, 255, 255));
+                painter.setPen(QColor(0, 0, 0, 0));
+                painter.drawEllipse(visualPosition, innerRadius, innerRadius);
+            }
+
+            // Color Points
+            for (int i = 0; i < mColorPoints.size(); ++i)
+            {
+                QPointF visualPosition = mEditModeCamera->toGUI(mColorPoints[i]->getPosition2D(mEditModeCamera->zoom() * COLOR_POINT_VISUAL_GAP));
+                QPointF actualPosition = mEditModeCamera->toGUI(mSelectedCurve->valueAt(mColorPoints[i]->mPosition));
+
+                // Draw a dashed line actual position to visual position
+                painter.setPen(mDenseDashedPen);
+                painter.drawLine(actualPosition, visualPosition);
+
+                // Outer disk
+                float outerRadius = mColorPoints[i]->mSelected ? 16 : 12;
+                outerRadius = qMin(outerRadius, outerRadius / mEditModeCamera->zoom());
+                painter.setBrush(QColor(128, 128, 128, 128));
+                painter.setPen(QColor(0, 0, 0, 0));
+                painter.drawEllipse(visualPosition, outerRadius, outerRadius);
+
+                // Inner disk
+                float innerRadius = 6;
+                innerRadius = qMin(innerRadius, innerRadius / mEditModeCamera->zoom());
+                painter.setBrush(QColor(255 * mColorPoints[i]->mColor.x(), //
+                                        255 * mColorPoints[i]->mColor.y(),
+                                        255 * mColorPoints[i]->mColor.z(),
+                                        255 * mColorPoints[i]->mColor.w()));
+                painter.setPen(QColor(0, 0, 0, 0));
+                painter.drawEllipse(visualPosition, innerRadius, innerRadius);
+            }
         }
     }
 }
