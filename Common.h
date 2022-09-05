@@ -25,18 +25,6 @@ enum class ShaderType { //
     BitmapShader
 };
 
-enum class WorkMode { //
-    View,
-    Edit,
-};
-
-enum class SubWorkMode { //
-    ViewOriginalImage,
-    ViewEdges,
-    ViewGaussianStack,
-    ViewEdgeStack
-};
-
 enum class ActionMode { //
     Select,
     AddControlPoint,
@@ -76,14 +64,27 @@ enum class Action { //
 
 };
 
+// Vectorizer
+enum class WorkMode { //
+    View,
+    Edit,
+};
+
+enum class SubWorkMode { //
+    ViewOriginalImage,
+    ViewEdges,
+    ViewGaussianStack,
+    ChooseEdgeStackLevel
+};
+
 enum class VectorizationStatus {
     Ready,
-    Finished,
     CreatingGaussianStack,
     CreatingEdgeStack,
     TracingEdges,
     CreatingPolylines,
-    ConstructingCurves
+    ConstructingCurves,
+    Finished,
 
 };
 

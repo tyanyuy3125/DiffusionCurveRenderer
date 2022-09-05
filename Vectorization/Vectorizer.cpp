@@ -21,55 +21,74 @@ Vectorizer::Vectorizer(QObject *parent)
 {
     mBitmapRenderer = BitmapRenderer::instance();
     mCurveManager = CurveManager::instance();
+
+    // onVectorize runs in a seperate thread
+    connect(this, &Vectorizer::vectorize, this, &Vectorizer::onVectorize, Qt::QueuedConnection);
 }
 
 void Vectorizer::load(QString path)
 {
+    if (mGaussianStack)
+        delete mGaussianStack;
+
+    if (mEdgeStack)
+        delete mEdgeStack;
+
     mProgressStatus.progress = 0.0f;
-    mProgressStatus.start = 0.0f;
-    mProgressStatus.end = 0.0f;
-    mUpdateInitialData = false;
-    clear();
 
     mOriginalImage = cv::imread(path.toStdString(), cv::IMREAD_COLOR);
+    mBlurredImage = mOriginalImage;
 
     cv::Canny(mOriginalImage, mEdgeImage, mCannyUpperThreshold, mCannyLowerThreshold);
 
+    mProgressStatus.progress = 0.0f;
     mVectorizationStatus = VectorizationStatus::CreatingGaussianStack;
     mProgressStatus.start = 0.0f;
-    mProgressStatus.end = 0.2f;
+    mProgressStatus.end = 0.5f;
     mGaussianStack = new GaussianStack(mProgressStatus, mOriginalImage);
 
     mVectorizationStatus = VectorizationStatus::CreatingEdgeStack;
-    mProgressStatus.start = 0.2f;
-    mProgressStatus.end = 0.4f;
+    mProgressStatus.start = 0.5f;
+    mProgressStatus.end = 1.0f;
     mEdgeStack = new EdgeStack(mProgressStatus, mGaussianStack, mCannyLowerThreshold, mCannyUpperThreshold);
 
+    mProgressStatus.progress = 1.0f;
+    mSubWorkMode = SubWorkMode::ViewOriginalImage;
+    mVectorizationStatus = VectorizationStatus::Ready;
+    mInit = true;
+    mUpdateInitialData = true;
+}
+
+void Vectorizer::onVectorize()
+{
+    mChains.clear();
+    mPolylines.clear();
+
     mVectorizationStatus = VectorizationStatus::TracingEdges;
-    mProgressStatus.start = 0.4f;
-    mProgressStatus.end = 0.6f;
-    traceEdgePixels(mProgressStatus, mChains, mEdgeStack->layer(0), 15);
+    mProgressStatus.start = 0.0f;
+    mProgressStatus.end = 0.45f;
+    traceEdgePixels(mProgressStatus, mChains, mEdgeStack->layer(mSelectedEdgeLayer), 5);
 
     qInfo() << "Chains detected."
             << "Number of chains is:" << mChains.size();
 
     // Create polylines
     mVectorizationStatus = VectorizationStatus::CreatingPolylines;
-    mProgressStatus.start = 0.6f;
-    mProgressStatus.end = 0.8f;
+    mProgressStatus.start = 0.45f;
+    mProgressStatus.end = 0.9f;
     for (int i = 0; i < mChains.size(); i++)
     {
         mProgressStatus.progress = mProgressStatus.start + (mProgressStatus.end - mProgressStatus.start) * float(i) / mChains.size();
 
-        PixelChain chain = mChains.at(i);
-        QVector<Point> polyline;
+        PixelChain chain = mChains[i];
+        QList<Point> polyline;
         potrace(polyline, chain);
-        mPolylines.emplace_back(polyline);
+        mPolylines << polyline;
     }
 
     // Now construct curves using polylines
     mVectorizationStatus = VectorizationStatus::ConstructingCurves;
-    mProgressStatus.start = 0.8f;
+    mProgressStatus.start = 0.9f;
     mProgressStatus.end = 1.0f;
     QVector<Bezier *> curves;
     constructCurves(mProgressStatus, curves, mPolylines);
@@ -81,7 +100,6 @@ void Vectorizer::load(QString path)
     mProgressStatus.progress = 1.0f;
     mSubWorkMode = SubWorkMode::ViewOriginalImage;
     mVectorizationStatus = VectorizationStatus::Finished;
-    mInit = true;
     mUpdateInitialData = true;
 }
 
@@ -123,52 +141,43 @@ void Vectorizer::draw()
 
     if (mUpdateInitialData)
     {
-        mBitmapRenderer->setData(mOriginalImage, mOriginalImage.cols, mOriginalImage.rows, GL_BGR);
+        mBitmapRenderer->setData(mOriginalImage, GL_BGR);
         mUpdateInitialData = false;
     }
 
-    ImGui::TextColored(ImVec4(1, 1, 0, 1), "SubWork Modes");
+    ImGui::TextColored(ImVec4(1, 1, 0, 1), "Sub Work Modes");
 
     int mode = (int) mSubWorkMode;
 
     if (ImGui::RadioButton("View Original Image", &mode, 0))
-        mBitmapRenderer->setData(mOriginalImage, mOriginalImage.cols, mOriginalImage.rows, GL_BGR);
+        mBitmapRenderer->setData(mOriginalImage, GL_BGR);
 
     if (ImGui::RadioButton("View Edges", &mode, 1))
-        mBitmapRenderer->setData(mEdgeImage, mEdgeImage.cols, mEdgeImage.rows, GL_RED);
+        mBitmapRenderer->setData(mEdgeImage, GL_RED);
 
     if (ImGui::RadioButton("View Gaussian Stack", &mode, 2))
-    {
-        auto layer = mGaussianStack->layer(mSelectedGaussianLayer);
-        mBitmapRenderer->setData(layer, layer.cols, layer.rows, GL_BGR);
-    }
+        mBitmapRenderer->setData(mGaussianStack->layer(mSelectedGaussianLayer), GL_BGR);
 
-    if (ImGui::RadioButton("View Edge Stack", &mode, 3))
-    {
-        auto layer = mEdgeStack->layer(mSelectedEdgeLayer);
-        mBitmapRenderer->setData(layer, layer.cols, layer.rows, GL_RED);
-    }
+    if (ImGui::RadioButton("Choose Edge Stack Level", &mode, 3))
+        mBitmapRenderer->setData(mEdgeStack->layer(mSelectedEdgeLayer), GL_RED);
 
     if (mSubWorkMode == SubWorkMode::ViewGaussianStack)
     {
         ImGui::TextColored(ImVec4(1, 1, 0, 1), "Gaussian Stack Layers");
 
         if (ImGui::SliderInt("Layer##Gaussian", &mSelectedGaussianLayer, 0, mGaussianStack->height() - 1))
-        {
-            auto layer = mGaussianStack->layer(mSelectedGaussianLayer);
-            mBitmapRenderer->setData(layer, layer.cols, layer.rows, GL_BGR);
-        }
+            mBitmapRenderer->setData(mGaussianStack->layer(mSelectedGaussianLayer), GL_BGR);
     }
 
-    if (mSubWorkMode == SubWorkMode::ViewEdgeStack)
+    if (mSubWorkMode == SubWorkMode::ChooseEdgeStackLevel)
     {
         ImGui::TextColored(ImVec4(1, 1, 0, 1), "Edge Stack Layers");
 
         if (ImGui::SliderInt("Layer##Edge", &mSelectedEdgeLayer, 0, mEdgeStack->height() - 1))
-        {
-            auto layer = mEdgeStack->layer(mSelectedEdgeLayer);
-            mBitmapRenderer->setData(layer, layer.cols, layer.rows, GL_RED);
-        }
+            mBitmapRenderer->setData(mEdgeStack->layer(mSelectedEdgeLayer), GL_RED);
+
+        if (ImGui::Button("Vectorize"))
+            emit vectorize();
     }
 
     mSubWorkMode = SubWorkMode(mode);
@@ -178,19 +187,6 @@ Vectorizer *Vectorizer::instance()
 {
     static Vectorizer instance;
     return &instance;
-}
-
-void Vectorizer::clear()
-{
-    if (mGaussianStack)
-        delete mGaussianStack;
-
-    if (mEdgeStack)
-        delete mEdgeStack;
-
-    mChains.clear();
-
-    mPolylines.clear();
 }
 
 /*

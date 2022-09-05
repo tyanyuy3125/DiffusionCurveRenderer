@@ -33,27 +33,34 @@ public slots:
     void draw();
 
 private:
-    void clear();
+    void onVectorize();
+    void updateEdges();
+
     void traceEdgePixels(ProgressStatus &progressStatus, QVector<PixelChain> &chains, cv::Mat edges, int lengthThreshold);
     void potrace(QVector<Point> &polyline, PixelChain chain);
     void findBestPath(QVector<Point> &bestPath, PixelChain chain, Eigen::MatrixXd penalties);
     void constructCurves(ProgressStatus &progressStatus, QVector<Bezier *> &curves, const QVector<QVector<Point>> &polylines);
     Bezier *constructCurve(const QVector<Point> &polyline, double tension = 2.0);
 
+signals:
+    void vectorize();
+
 private:
     BitmapRenderer *mBitmapRenderer;
     CurveManager *mCurveManager;
 
-    double mCannyUpperThreshold;
-    double mCannyLowerThreshold;
+    float mCannyUpperThreshold;
+    float mCannyLowerThreshold;
 
     // Updated when an image is loaded
     cv::Mat mOriginalImage;
+    cv::Mat mBlurredImage;
     cv::Mat mEdgeImage;
+
     GaussianStack *mGaussianStack;
     EdgeStack *mEdgeStack;
-    QVector<PixelChain> mChains;
-    QVector<QVector<Point>> mPolylines;
+    QList<PixelChain> mChains;
+    QList<QVector<Point>> mPolylines;
 
     SubWorkMode mSubWorkMode;
     VectorizationStatus mVectorizationStatus;

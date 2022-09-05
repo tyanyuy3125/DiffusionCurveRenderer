@@ -41,13 +41,13 @@ void BitmapRenderer::render()
     mShaderManager->release();
 }
 
-void BitmapRenderer::setData(cv::Mat image, int width, int height, GLenum format)
+void BitmapRenderer::setData(cv::Mat image, GLenum format)
 {
     if (mTexture)
         glDeleteTextures(1, &mTexture);
 
-    mTextureWidth = width;
-    mTextureHeight = height;
+    mTextureWidth = image.cols;
+    mTextureHeight = image.rows;
 
     mImageTransformation.setToIdentity();
     mImageTransformation.scale(QVector3D(mTextureWidth / 2.0, mTextureHeight / 2.0, 1));

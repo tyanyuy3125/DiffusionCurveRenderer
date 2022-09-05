@@ -45,6 +45,7 @@ Controller::Controller(QObject *parent)
 Controller::~Controller()
 {
     qDebug() << Q_FUNC_INFO;
+    mVectorizerThread.terminate();
 }
 
 void Controller::init()
@@ -79,6 +80,7 @@ void Controller::init()
         manager->init();
 
     connect(mWindow, &Window::destroyed, this, [=]() { //
+        qDebug() << Q_FUNC_INFO;
         mVectorizerThread.terminate();
     });
 
