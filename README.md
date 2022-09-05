@@ -5,7 +5,7 @@ If you do not want to import an image to the application in order to run the vec
 
 The ideas belong to [Orzan et al.](https://hal.archives-ouvertes.fr/inria-00274768/)
 
-I took vectorization algorithms from this [repo](https://hal.archives-ouvertes.fr/inria-00274768/) and adopted.
+I took vectorization algorithms from this [repo](https://github.com/zhuethanca/DiffusionCurves) and adopted.
 
 Vectorization algorithms run on CPU but the diffusion algorithm runs on GPU providing real time editing.
 
