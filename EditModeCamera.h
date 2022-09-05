@@ -28,6 +28,7 @@ public:
     QPointF toGUI(const QVector2D &position) const;
     QRectF toGUI(const QRectF &rect) const;
 
+    float pixelRatio() const;
     void setPixelRatio(float newPixelRatio);
 
     float zoom() const;
@@ -38,6 +39,9 @@ public:
 
     float top() const;
     void setTop(float newTop);
+
+    float width() const;
+    float height() const;
 
 private:
     float mZNear;

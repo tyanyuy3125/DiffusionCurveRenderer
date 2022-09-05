@@ -120,6 +120,11 @@ QRectF EditModeCamera::toGUI(const QRectF &rect) const
     return QRectF(center.x() - 0.5 * w, center.y() - 0.5 * h, w, h);
 }
 
+float EditModeCamera::pixelRatio() const
+{
+    return mPixelRatio;
+}
+
 void EditModeCamera::setPixelRatio(float newPixelRatio)
 {
     mPixelRatio = newPixelRatio;
@@ -143,6 +148,16 @@ float EditModeCamera::top() const
 void EditModeCamera::setTop(float newTop)
 {
     mTop = newTop;
+}
+
+float EditModeCamera::width() const
+{
+    return mWidth;
+}
+
+float EditModeCamera::height() const
+{
+    return mHeight;
 }
 
 float EditModeCamera::zoom() const

@@ -23,6 +23,7 @@ public:
 
     QMatrix4x4 projection() const;
 
+    float pixelRatio() const;
     void setPixelRatio(float newPixelRatio);
 
     float zoom() const;
@@ -33,6 +34,9 @@ public:
 
     float top() const;
     void setTop(float newTop);
+
+    float width() const;
+    float height() const;
 
 private:
     float mZNear;

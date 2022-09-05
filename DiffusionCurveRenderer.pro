@@ -12,7 +12,6 @@ include(Dependencies/qtimgui/qtimgui.pri)
 
 SOURCES += \
     Bezier.cpp \
-    BitmapRenderer.cpp \
     BlurPoint.cpp \
     ColorPoint.cpp \
     ControlPoint.cpp \
@@ -27,7 +26,12 @@ SOURCES += \
     Manager.cpp \
     Points.cpp \
     Quad.cpp \
-    RendererManager.cpp \
+    Renderers/BitmapRenderer.cpp \
+    Renderers/ColorRenderer.cpp \
+    Renderers/ContourRenderer.cpp \
+    Renderers/DiffusionRenderer.cpp \
+    Renderers/RendererBase.cpp \
+    Renderers/RendererManager.cpp \
     Shader.cpp \
     ShaderManager.cpp \
     Vectorization/EdgeStack.cpp \
@@ -40,7 +44,6 @@ SOURCES += \
 
 HEADERS += \
     Bezier.h \
-    BitmapRenderer.h \
     BlurPoint.h \
     ColorPoint.h \
     Common.h \
@@ -55,7 +58,12 @@ HEADERS += \
     Manager.h \
     Points.h \
     Quad.h \
-    RendererManager.h \
+    Renderers/BitmapRenderer.h \
+    Renderers/ColorRenderer.h \
+    Renderers/ContourRenderer.h \
+    Renderers/DiffusionRenderer.h \
+    Renderers/RendererBase.h \
+    Renderers/RendererManager.h \
     Shader.h \
     ShaderManager.h \
     Vectorization/EdgeStack.h \

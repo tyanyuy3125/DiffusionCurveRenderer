@@ -62,10 +62,10 @@ void BitmapRenderer::setData(cv::Mat image, GLenum format)
     glGenerateMipmap(GL_TEXTURE_2D);
 }
 
-void BitmapRenderer::resize(int width, int height)
+void BitmapRenderer::resize(int w, int h)
 {
-    mScreenWidth = width;
-    mScreeHeight = height;
+    mScreenWidth = w;
+    mScreeHeight = h;
 }
 
 void BitmapRenderer::setPixelRatio(float newPixelRatio)

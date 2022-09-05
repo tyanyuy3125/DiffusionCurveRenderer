@@ -82,6 +82,11 @@ QMatrix4x4 ViewModeCamera::projection() const
     return projection;
 }
 
+float ViewModeCamera::pixelRatio() const
+{
+    return mPixelRatio;
+}
+
 void ViewModeCamera::setPixelRatio(float newPixelRatio)
 {
     mPixelRatio = newPixelRatio;
@@ -105,6 +110,16 @@ float ViewModeCamera::top() const
 void ViewModeCamera::setTop(float newTop)
 {
     mTop = newTop;
+}
+
+float ViewModeCamera::width() const
+{
+    return mWidth;
+}
+
+float ViewModeCamera::height() const
+{
+    return mHeight;
 }
 
 float ViewModeCamera::zoom() const

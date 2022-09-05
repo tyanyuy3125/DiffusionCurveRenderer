@@ -2,11 +2,11 @@
 #define VECTORIZER_H
 
 #include "Bezier.h"
-#include "BitmapRenderer.h"
 #include "CurveManager.h"
 #include "EdgeStack.h"
 #include "GaussianStack.h"
 #include "PixelChain.h"
+#include "Renderers/BitmapRenderer.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/core/mat.hpp>
@@ -39,9 +39,12 @@ private:
     void traceEdgePixels(ProgressStatus &progressStatus, QVector<PixelChain> &chains, cv::Mat edges, int lengthThreshold);
     void potrace(QVector<Point> &polyline, PixelChain chain);
     void findBestPath(QVector<Point> &bestPath, PixelChain chain, Eigen::MatrixXd penalties);
+
     void constructCurves(ProgressStatus &progressStatus, QVector<Bezier *> &curves, const QVector<QVector<Point>> &polylines);
     Bezier *constructCurve(const QVector<Point> &polyline, double tension = 2.0);
-    void sampleColors(Bezier *curve, cv::Mat &image, cv::Mat &imageLab, double sampleDensity);
+
+    void sampleColors(ProgressStatus &progressStatus, QVector<Bezier *> &curves, cv::Mat &image, cv::Mat &imageLab, double sampleDensity);
+    cv::Vec3b *sampleAlongNormal(cv::Mat &image, cv::Mat &imageLab, QVector2D point, QVector2D normal, double distance);
 
 signals:
     void vectorize();
@@ -62,6 +65,7 @@ private:
     GaussianStack *mGaussianStack;
     EdgeStack *mEdgeStack;
     QList<PixelChain> mChains;
+
     QList<QVector<Point>> mPolylines;
 
     SubWorkMode mSubWorkMode;

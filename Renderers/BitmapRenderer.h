@@ -16,13 +16,13 @@ private:
     explicit BitmapRenderer(QObject *parent = nullptr);
 
 public:
+    static BitmapRenderer *instance();
+
     bool init() override;
     void render();
     void setData(cv::Mat image, GLenum format);
-    void resize(int width, int height);
+    void resize(int w, int h);
     void setPixelRatio(float newPixelRatio);
-
-    static BitmapRenderer *instance();
 
 private:
     ShaderManager *mShaderManager;

@@ -1,12 +1,12 @@
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 
-#include "BitmapRenderer.h"
 #include "Common.h"
 #include "CurveManager.h"
 #include "CustomVariant.h"
 #include "EditModeCamera.h"
-#include "RendererManager.h"
+#include "Renderers/BitmapRenderer.h"
+#include "Renderers/RendererManager.h"
 #include "ShaderManager.h"
 #include "Vectorization/Vectorizer.h"
 #include "ViewModeCamera.h"
